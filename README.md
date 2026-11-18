@@ -8,7 +8,7 @@ Open `index.html` in a browser. Space Grotesk and IBM Plex Mono are loaded from 
 
 ## GitHub Pages
 
-This is a static site and needs no build step. Keep `index.html` at the repository root, then configure GitHub Pages to deploy from the root of the `main` branch. A project repository named `seqtrak-field-display` is served at `https://<username>.github.io/seqtrak-field-display/`.
+This is a static site and needs no build step. Keep `index.html` at the repository root, then configure GitHub Pages to deploy from the root of the `main` branch. A project repository named `seqtrak-field-display` is served at `https://neotrance.github.io/seqtrak-field-display/`.
 
 ## Language and appearance
 
