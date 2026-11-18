@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SEQTRAK FIELD DISPLAY v1.3.7</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="data/catalog.js" defer></script>
+    <script src="data/fx-specs.js" defer></script>
+    <script src="js/i18n.js" defer></script>
+    <script src="js/display-state.js" defer></script>
+    <script src="js/fx-model.js" defer></script>
+    <script src="js/display-renderer.js" defer></script>
+    <script src="js/app.js" defer></script>
+  </head>
+  <body>
+    <header class="page-header">
+      <div class="header-main">
+        <h1>SEQTRAK / FIELD DISPLAY <span>v1.3.7 · 4× HI-DPI · FIXED FONT</span></h1>
+        <p data-i18n="subtitle">A Mac browser prototype for automatically displaying sound names and parameters received from SEQTRAK. The display on the left is a preview only; it does not connect to BLE MIDI or hardware.</p>
+      </div>
+      <div class="header-tools">
+        <label for="language"><span data-i18n="language">Display language</span>
+          <select id="language" aria-label="Display language" data-i18n-attr="aria-label:language">
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+          </select>
+        </label>
+        <button id="themeToggle" type="button">Switch to light mode</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <main>
+        <div class="preview-controls" aria-label="Preview size" data-i18n-attr="aria-label:previewControls">
+          <button id="actual" type="button" data-i18n="actualSize">Actual size · 320 px</button>
+          <button id="zoom" class="active" type="button" data-i18n="zoomPreview">Zoom preview</button>
+          <span id="sizeNote" class="preview-note" data-i18n="zoomed">Zoomed preview</span>
+        </div>
+        <div id="hardware" class="hardware">
+          <div class="screen">
+            <canvas id="display" width="1280" height="680" aria-label="SEQTRAK external display, 320 by 170 pixels" data-i18n-attr="aria-label:screenAria"></canvas>
+          </div>
+        </div>
+        <p class="preview-note detail-note" data-i18n="detailNote">The canvas is 1280 × 680 px and represents a 320 × 170 px display. Instrument shapes and lines illustrate categories and parameters; they are not audio waveforms. Actual size uses 320 × 170 CSS pixels.</p>
+      </main>
+
+      <aside class="panel controls-scroll" tabindex="0" aria-label="Mac preview controls" data-i18n-attr="aria-label:panelAria">
+        <section>
+          <h2 data-i18n="familyDemo">DISPLAY FAMILY / DEMO</h2>
+          <div id="tracks" class="tracks"></div>
+          <label for="preset"><span data-i18n="soundPreset">SOUND PRESET</span><output id="count"></output></label>
+          <select id="preset"></select>
+          <p class="help" data-i18n="soundPreviewHelp">Family and preset selection are for preview only. MIDI CC does not identify preset names, so names are shown only when available.</p>
+
+          <label for="cutoff"><span data-i18n="cutoff">FILTER CUTOFF</span><output id="cutoffVal">74</output></label>
+          <input id="cutoff" type="range" min="0" max="127" value="74">
+          <label for="resonance"><span data-i18n="resonance">FILTER RESONANCE</span><output id="resonanceVal">35</output></label>
+          <input id="resonance" type="range" min="0" max="127" value="35">
+          <label for="decay"><span data-i18n="decayRelease">DECAY / RELEASE</span><output id="decayVal">55</output></label>
+          <input id="decay" type="range" min="0" max="127" value="55">
+          <div class="actions">
+            <button id="play" type="button" data-i18n="play">▶ PLAY</button>
+            <button id="next" type="button" data-i18n="nextSound">NEXT SOUND →</button>
+          </div>
+        </section>
+
+        <section class="section-divider">
+          <h2 data-i18n="effectDemo">EFFECT DISPLAY / DEMO</h2>
+          <label for="fxScope"><span data-i18n="effectSlot">EFFECT SLOT</span></label>
+          <select id="fxScope">
+            <option value="Single" data-i18n="singleEffect">SINGLE EFFECT</option>
+            <option value="Send" data-i18n="sendEffect">SEND EFFECT</option>
+            <option value="Master 1" data-i18n="masterEffect1">MASTER EFFECT 1</option>
+            <option value="Master 2" data-i18n="masterEffect2">MASTER EFFECT 2</option>
+            <option value="Master 3" data-i18n="masterEffect3">MASTER EFFECT 3</option>
+          </select>
+          <label for="fxCategory"><span data-i18n="effectCategory">EFFECT CATEGORY</span></label>
+          <select id="fxCategory"></select>
+          <label for="fxType"><span data-i18n="effectType">EFFECT TYPE</span></label>
+          <select id="fxType"></select>
+          <label for="fxParameter"><span data-i18n="fxParameter">FX PARAMETER</span></label>
+          <select id="fxParameter"></select>
+          <label for="fxParamValue"><span data-i18n="value">VALUE</span><output id="fxParamValueLabel">—</output></label>
+          <input id="fxParamValue" type="range" min="0" max="127" value="64">
+          <p id="fxParamMeta" class="help"></p>
+          <label for="fxVisualIntensity"><span data-i18n="illustrativeIntensity">ILLUSTRATIVE INTENSITY / DEMO ONLY</span><output id="fxVisualIntensityVal">65</output></label>
+          <input id="fxVisualIntensity" type="range" min="0" max="127" value="65">
+          <div class="actions fx-level-tests">
+            <button type="button" class="fx-test" data-level="0" data-i18n="min">MIN</button>
+            <button type="button" class="fx-test" data-level="0.5" data-i18n="mid">MID</button>
+            <button type="button" class="fx-test" data-level="1" data-i18n="max">MAX</button>
+          </div>
+          <p id="fxVisualHint" class="help"></p>
+        </section>
+
+        <section class="section-divider">
+          <h2 data-i18n="midiTest">DOCUMENTED MIDI CC / EVENT TEST</h2>
+          <p class="help" data-i18n="midiHelp">This preview uses channels, CC numbers, and value ranges documented in the user guide. It does not connect to or send data to MIDI hardware.</p>
+          <label for="midiChannel"><span data-i18n="midiChannel">MIDI CHANNEL</span></label>
+          <select id="midiChannel"></select>
+          <label for="midiController"><span data-i18n="controlChange">CONTROL CHANGE</span></label>
+          <select id="midiController"></select>
+          <label for="midiValue"><span data-i18n="value">VALUE</span><output id="midiValueLabel">64</output></label>
+          <input id="midiValue" type="range" min="0" max="127" value="64">
+          <button id="applyMidiEvent" type="button" data-i18n="applyCc">Apply CC event to display</button>
+          <div class="performance-preview">
+            <h2 data-i18n="performanceDemo">PERFORMANCE INPUT / DEMO</h2>
+            <label for="bpmPreview"><span data-i18n="bpmPreview">BPM PREVIEW (5–300)</span></label>
+            <div class="inline-fields">
+              <input id="bpmPreview" type="number" min="5" max="300" step="any" inputmode="decimal">
+              <button id="setBpmPreview" type="button" data-i18n="setBpmPreview">SET PREVIEW BPM</button>
+            </div>
+            <div class="actions bpm-step-buttons">
+              <button id="bpmDownPreview" type="button" data-i18n="bpmDownDemo" disabled>−1 BPM</button>
+              <button id="bpmUpPreview" type="button" data-i18n="bpmUpDemo" disabled>+1 BPM</button>
+            </div>
+            <p class="help" data-i18n="bpmPreviewHelp">Preview only. This does not read from or send tempo to SEQTRAK.</p>
+            <div class="note-preview-fields">
+              <div>
+                <label for="noteNumber"><span data-i18n="noteNumber">MIDI NOTE NUMBER (0–127)</span></label>
+                <input id="noteNumber" type="number" min="0" max="127" value="60">
+              </div>
+              <div>
+                <label for="noteVelocity"><span data-i18n="velocity">VELOCITY (0–127)</span></label>
+                <input id="noteVelocity" type="number" min="0" max="127" value="96">
+              </div>
+            </div>
+            <div class="actions note-preview-actions">
+              <button id="noteOnPreview" type="button" data-i18n="noteOn">NOTE ON</button>
+              <button id="noteOffPreview" type="button" data-i18n="noteOff">NOTE OFF</button>
+            </div>
+            <p class="help" data-i18n="notePreviewHelp">Plots recent MIDI note events only; it does not read a saved pattern.</p>
+          </div>
+          <details class="legacy-panel">
+            <summary data-i18n="legacySummary">v1.3.4 FX address input test</summary>
+            <p class="help" data-i18n="legacyHelp">This address format and mapping are not confirmed in the supplied user guide and have not been tested on hardware. Retained as a legacy demo only; it is not a connection protocol.</p>
+            <label for="sysexAddress"><span data-i18n="parameterAddress">PARAMETER ADDRESS (3 bytes)</span></label>
+            <input id="sysexAddress" value="30 43 00" spellcheck="false">
+            <label for="sysexValue"><span data-i18n="effectTypeMsb">EFFECT TYPE MSB / LSB</span></label>
+            <input id="sysexValue" value="01 02" spellcheck="false">
+            <div class="actions">
+              <button id="applyFxEvent" type="button" data-i18n="tryLegacy">Try legacy event</button>
+              <button id="demoFxSequence" type="button" data-i18n="legacyDemo">Legacy demo</button>
+            </div>
+          </details>
+          <pre id="eventLog" aria-live="polite">Ready. No hardware connected.</pre>
+        </section>
+      </aside>
+    </div>
+  </body>
+</html>
