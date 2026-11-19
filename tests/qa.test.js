@@ -9,6 +9,7 @@ const vm = require("node:vm");
 const root = path.resolve(__dirname, "..");
 const stateModel = require(path.join(root, "js/display-state.js"));
 const fxModel = require(path.join(root, "js/fx-model.js"));
+const fxUnit = require(path.join(root, "js/fx-unit.js"));
 const i18n = require(path.join(root, "js/i18n.js"));
 const renderer = require(path.join(root, "js/display-renderer.js"));
 
@@ -22,6 +23,7 @@ function loadBrowserData(relativePath, property) {
 
 const catalog = loadBrowserData("data/catalog.js", "SEQTRAK_CATALOG");
 const fxSpecs = loadBrowserData("data/fx-specs.js", "SEQTRAK_FX_SPECS");
+const hardwareFxPresets = loadBrowserData("data/seqtrak-fx-presets.js", "SEQTRAK_HARDWARE_FX_PRESETS");
 
 function fakeCanvasContext() {
   const values = {};
@@ -148,8 +150,74 @@ test("FX parameter lookup respects effect blocks and refuses ambiguous ranges", 
   assert.equal(unavailable.length, 0);
 });
 
+test("hardware FX dial follows the guide's eight categories and eight presets per category", function () {
+  assert.deepEqual(Array.from(hardwareFxPresets.categories), ["FILTER", "REVERB", "DELAY", "COMPRESSOR", "DISTORTION", "MODULATION", "DUCKER", "OTHER"]);
+  ["Single", "Master 1"].forEach(function (scope) {
+    const presets = fxUnit.presetsFor(scope, hardwareFxPresets, catalog.effects);
+    assert.equal(presets.length, 64);
+    hardwareFxPresets.categories.forEach(function (category) {
+      const categoryPresets = presets.filter(function (preset) { return preset.category === category; });
+      assert.equal(categoryPresets.length, 8, scope + " " + category);
+      assert.deepEqual(Array.from(categoryPresets, function (preset) { return preset.number; }), [1, 2, 3, 4, 5, 6, 7, 8]);
+      assert.ok(categoryPresets.every(function (preset) { return Boolean(preset.effect); }), scope + " " + category + " effect types must exist in the catalog");
+    });
+  });
+
+  const single = fxUnit.presetsFor("Single", hardwareFxPresets, catalog.effects);
+  const master = fxUnit.presetsFor("Master 1", hardwareFxPresets, catalog.effects);
+  assert.equal(single[0].name, "LPF - NO RESONANCE");
+  assert.equal(single[7].name, "HPF - HIGH RESONANCE");
+  assert.equal(fxUnit.nextIndex(0, -1, single.length), 63);
+  assert.equal(fxUnit.nextIndex(63, 1, single.length), 0);
+  assert.equal(fxUnit.findIndexForPreset(master, single.find(function (preset) { return preset.category === "DISTORTION" && preset.number === 2; })), 33);
+});
+
+test("FX display shows the selected SEQTRAK preset name, category, and preset number", function () {
+  const texts = [];
+  const context = new Proxy({}, {
+    get: function (target, property) {
+      if (property === "fillText") return function (value) { texts.push(String(value)); };
+      if (property in target) return target[property];
+      return function () {};
+    },
+    set: function (target, property, value) { target[property] = value; return true; }
+  });
+  const effect = catalog.effects.find(function (item) { return item.name === "CONTROL FILTER"; });
+  const parameter = fxModel.getFxParameters(effect, "Single", fxSpecs.parameters)[0];
+  const state = Object.assign({}, stateModel.createInitialState(), {
+    view: "effect",
+    fx: {
+      scope: "Single",
+      effect: effect,
+      parameter: parameter,
+      parameterValue: 64,
+      formattedValue: "64",
+      presetName: "LPF - NO RESONANCE",
+      presetCategory: "FILTER",
+      presetNumber: 1,
+      visualIntensity: 65
+    }
+  });
+
+  renderer.render(context, state, 100, fxModel);
+  assert.ok(texts.includes("LPF - NO RESONANCE"));
+  assert.ok(texts.some(function (text) { return /FILTER 01\/08/.test(text); }));
+});
+
+test("FX page maps touch strips as documented and performance strips bypass on release", function () {
+  assert.deepEqual(fxUnit.stripMapping(1, "fxLevel"), { kind: "effectParameter", number: 1 });
+  assert.deepEqual(fxUnit.stripMapping(1, "highPass"), { kind: "performance", parameter: "HIGH PASS FILTER CUTOFF", effect: "highPass" });
+  assert.deepEqual(fxUnit.stripMapping(1, "repeater"), { kind: "performance", parameter: "BEAT REPEAT LENGTH", effect: "repeater" });
+  assert.deepEqual(fxUnit.stripMapping(2, "fxLevel"), { kind: "effectParameter", number: 1 });
+  assert.deepEqual(fxUnit.stripMapping(2, "highPass"), { kind: "effectParameter", number: 2 });
+  assert.deepEqual(fxUnit.stripMapping(2, "repeater"), { kind: "effectParameter", number: 3 });
+  assert.equal(fxUnit.pointerValue(262, 262, 358, 0, 127), 127);
+  assert.equal(fxUnit.pointerValue(358, 262, 358, 0, 127), 0);
+  assert.equal(fxUnit.pointerValue(100, 262, 358, 0, 127), 127);
+});
+
 test("fixed fonts and the 4x canvas backing store remain in place", function () {
-  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const html = fs.readFileSync(path.join(root, "display-preview.html"), "utf8");
   const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
   const app = fs.readFileSync(path.join(root, "js/app.js"), "utf8");
 
@@ -168,7 +236,7 @@ test("fixed fonts and the 4x canvas backing store remain in place", function () 
 });
 
 test("English is the initial UI language and English/Japanese strings are available", function () {
-  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const html = fs.readFileSync(path.join(root, "display-preview.html"), "utf8");
   const state = stateModel.createInitialState();
 
   assert.equal(state.language, "en");
@@ -182,7 +250,7 @@ test("English is the initial UI language and English/Japanese strings are availa
 });
 
 test("all declared and rendered translation keys exist in both locales", function () {
-  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const html = fs.readFileSync(path.join(root, "display-preview.html"), "utf8");
   const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
   const sources = ["js/app.js", "js/display-renderer.js"].map(function (file) {
     return fs.readFileSync(path.join(root, file), "utf8");
@@ -206,7 +274,7 @@ test("all declared and rendered translation keys exist in both locales", functio
 });
 
 test("preview exposes unknown BPM and recent note events, not a fabricated saved pattern", function () {
-  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const html = fs.readFileSync(path.join(root, "display-preview.html"), "utf8");
   const rendererSource = fs.readFileSync(path.join(root, "js/display-renderer.js"), "utf8");
   const initial = stateModel.createInitialState();
 
@@ -217,6 +285,445 @@ test("preview exposes unknown BPM and recent note events, not a fabricated saved
   assert.match(html, /id="noteOffPreview"/);
   assert.match(html, /does not read a saved pattern/);
   assert.doesNotMatch(rendererSource, /120 BPM/);
+});
+
+test("recording and held-note indicators require explicit state and show pitch class only", function () {
+  const texts = [];
+  const context = new Proxy({}, {
+    get: function (target, property) {
+      if (property === "fillText") return function (value) { texts.push(String(value)); };
+      if (property in target) return target[property];
+      return function () {};
+    },
+    set: function (target, property, value) { target[property] = value; return true; }
+  });
+  const initial = stateModel.createInitialState();
+  assert.equal(initial.recording, false);
+  assert.equal(initial.activeNote, null);
+
+  renderer.render(context, initial, 100, fxModel);
+  assert.equal(texts.includes("REC"), false);
+  assert.equal(texts.includes("C"), false);
+
+  texts.length = 0;
+  renderer.render(context, Object.assign({}, initial, { recording: true, activeNote: 61 }), 100, fxModel);
+  assert.equal(texts.includes("REC"), true);
+  assert.equal(texts.includes("C#"), true);
+  assert.equal(texts.includes("C#4"), false);
+  assert.equal(texts.includes("DEMO"), true);
+});
+
+test("filter parameters show received values without drawing an inferred response curve", function () {
+  for (const key of ["cutoff", "resonance"]) {
+    let lineSegments = 0;
+    const context = new Proxy({}, {
+      get: function (target, property) {
+        if (property === "lineTo") return function () { lineSegments += 1; };
+        if (property in target) return target[property];
+        return function () {};
+      },
+      set: function (target, property, value) { target[property] = value; return true; }
+    });
+    const state = Object.assign({}, stateModel.createInitialState(), {
+      view: "parameter",
+      currentParameter: { key: key, name: key.toUpperCase(), value: 64, min: 0, max: 127 }
+    });
+
+    renderer.render(context, state, 100, fxModel);
+    assert.ok(lineSegments < 40, key + " should use a value meter, not a synthesized response curve");
+  }
+});
+
+test("hardware preview exposes recording and MIDI note demo controls", function () {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+
+  assert.match(html, /id="recordToggle"/);
+  assert.match(html, /id="noteKeys"/);
+  assert.match(html, /REC and note controls are simulations only/);
+  assert.match(html, /MIDI NOTE/);
+  assert.match(html, /MIDI NOTE INPUT · SIMULATED EVENT/);
+  assert.match(html, /do not claim a physical-key mapping/);
+  assert.match(html, /selectedSynthTrack/);
+  assert.match(html, /Drum-section pads are sequence controls/);
+});
+
+test("hardware preview simulates FX controls and 16 physical drum sequence pads", function () {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const rendererSource = fs.readFileSync(path.join(root, "js/display-renderer.js"), "utf8");
+  const fxUnitSource = fs.readFileSync(path.join(root, "js/fx-unit.js"), "utf8");
+
+  assert.match(html, /id="fxKnob"[^>]*role="button"/);
+  assert.match(html, /id="fxModeControl"[^>]*role="switch"/);
+  assert.match(html, /id="fxPageControl"[^>]*type="button"/);
+  assert.match(html, /SIM PAGE 1/);
+  const hardwareSvg = html.match(/<svg[\s\S]*?<\/svg>/)[0];
+  assert.doesNotMatch(hardwareSvg, /id="fxPageControl"/);
+  assert.doesNotMatch(hardwareSvg, /<circle cx="854" cy="328"/);
+  assert.doesNotMatch(hardwareSvg, /<circle cx="854" cy="344"/);
+  assert.match(html, /id="fxStripLevel"[^>]*role="slider"/);
+  assert.match(html, /id="fxStripHighPass"[^>]*role="slider"/);
+  assert.match(html, /id="fxStripRepeater"[^>]*role="slider"/);
+  assert.match(html, /fxUnitPage === 1/);
+  assert.match(html, /Drag or scroll the FX knob/);
+  assert.match(rendererSource, /HOLD TO APPLY · RELEASE TO BYPASS/);
+  assert.match(html, /id="drumHardwareSteps"/);
+  assert.match(html, /index < 16/);
+  assert.match(html, /toggleDrumStep\(index\)/);
+  assert.match(html, /id="micGrid"/);
+  assert.match(html, /id="fxStripLabelLevel" x="1017"/);
+  assert.match(html, /id="fxStripLabelHighPass" x="1112"/);
+  assert.match(html, /id="fxStripLabelRepeater" x="1242"/);
+  assert.doesNotMatch(html, /FRONT VIEW · MONOCHROME/);
+  assert.match(fxUnitSource, /HIGH PASS FILTER CUTOFF/);
+  assert.match(fxUnitSource, /BEAT REPEAT LENGTH/);
+  assert.match(rendererSource, /drawFxPerformance/);
+});
+
+test("GitHub Pages root opens hardware preview and keeps the original preview available", function () {
+  const rootPage = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const oldPreview = fs.readFileSync(path.join(root, "display-preview.html"), "utf8");
+  const previousHardwarePath = fs.readFileSync(path.join(root, "hardware-preview.html"), "utf8");
+
+  assert.match(rootPage, /<html lang="en" data-theme="light">/);
+  assert.match(rootPage, /id="drumSteps"/);
+  assert.match(oldPreview, /id="language"/);
+  assert.match(oldPreview, /id="themeToggle"/);
+  assert.notEqual(rootPage, oldPreview);
+  assert.match(previousHardwarePath, /url=\.\/index\.html/);
+});
+
+test("hardware preview is English-only and its light-mode control updates display theme", function () {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+
+  assert.match(html, /<html lang="en" data-theme="light">/);
+  assert.match(html, /id="themeToggle"[^>]*>Switch to dark mode<\/button>/);
+  assert.match(html, /:root\[data-theme="light"\]/);
+  assert.match(html, /theme = theme === "dark" \? "light" : "dark"/);
+  assert.match(html, /theme: theme/);
+  assert.doesNotMatch(html, /languageToggle|data-ja=/);
+  assert.doesNotMatch(html, /[\u3040-\u30ff\u3400-\u9fff]/);
+  const inlineScript = html.match(/<script>\s*([\s\S]*?)\s*<\/script>/);
+  assert.ok(inlineScript, "hardware preview controller script should be present");
+  assert.doesNotThrow(function () { new Function(inlineScript[1]); });
+});
+
+test("light theme renders a light display canvas", function () {
+  const fills = [];
+  const context = new Proxy({}, {
+    get: function (target, property) {
+      if (property in target) return target[property];
+      return function () {};
+    },
+    set: function (target, property, value) {
+      target[property] = value;
+      if (property === "fillStyle") fills.push(value);
+      return true;
+    }
+  });
+
+  renderer.render(context, Object.assign({}, stateModel.createInitialState(), { theme: "light" }), 100, fxModel);
+  assert.ok(fills.includes("#F5F7F5"));
+});
+
+test("drum overview and parameter view show only explicit 16-step data with decay", function () {
+  const texts = [];
+  const context = new Proxy({}, {
+    get: function (target, property) {
+      if (property === "fillText") return function (value) { texts.push(String(value)); };
+      if (property in target) return target[property];
+      return function () {};
+    },
+    set: function (target, property, value) { target[property] = value; return true; }
+  });
+  const family = catalog.tracks.find(function (track) { return track.id === "kick"; });
+  const drum = Object.assign({}, stateModel.createInitialState(), {
+    track: family,
+    deviceTrack: { name: "KICK / DRUM", channel: 1, family: "kick" },
+    drumPattern: [true, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false],
+    drumPatternNumber: 2,
+    drumPatternSource: "PREVIEW"
+  });
+
+  renderer.render(context, drum, 100, fxModel);
+  assert.ok(texts.includes("PATTERN 02 · 16 STEPS · PREVIEW"));
+  assert.ok(texts.includes("DECAY"));
+  assert.ok(texts.includes("55"));
+
+  texts.length = 0;
+  const parameter = Object.assign({}, drum, {
+    view: "parameter",
+    currentParameter: { key: "decay", name: "DECAY / RELEASE TIME", value: 73, min: 0, max: 127 }
+  });
+  renderer.render(context, parameter, 100, fxModel);
+  assert.ok(texts.includes("PATTERN 02 · 16 STEPS · PREVIEW"));
+  assert.ok(texts.includes("DECAY / RELEASE TIME"));
+  assert.ok(texts.includes("73"));
+
+  texts.length = 0;
+  renderer.render(context, Object.assign({}, drum, { drumPattern: null }), 100, fxModel);
+  assert.equal(texts.some(function (text) { return /16 STEPS/.test(text); }), false);
+});
+
+test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", function () {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const inlineScript = html.match(/<script>\s*([\s\S]*?)\s*<\/script>/)[1];
+  const elements = new Map();
+  const textDrawn = [];
+  const fills = [];
+  let onReady = null;
+  let nextFrame = null;
+  let nowTime = 1000;
+
+  function makeElement(id, tagName) {
+    const classes = new Set();
+    const element = {
+      id: id,
+      tagName: tagName || "DIV",
+      children: [],
+      handlers: {},
+      attributes: {},
+      dataset: {},
+      value: "",
+      textContent: "",
+      disabled: false,
+      classList: {
+        add: function (name) { classes.add(name); },
+        remove: function (name) { classes.delete(name); },
+        contains: function (name) { return classes.has(name); },
+        toggle: function (name, force) {
+          const enable = force === undefined ? !classes.has(name) : force;
+          if (enable) classes.add(name); else classes.delete(name);
+          return enable;
+        }
+      },
+      addEventListener: function (name, handler) {
+        if (!this.handlers[name]) this.handlers[name] = [];
+        this.handlers[name].push(handler);
+      },
+      dispatch: function (name, event) {
+        const payload = Object.assign({ target: this, preventDefault: function () {} }, event || {});
+        (this.handlers[name] || []).forEach(function (handler) { handler(payload); });
+      },
+      append: function (child) {
+        this.children.push(child);
+        if (this.tagName === "SELECT" && !this.value) this.value = child.value;
+      },
+      replaceChildren: function () { this.children = []; if (this.tagName === "SELECT") this.value = ""; },
+      querySelectorAll: function (selector) { return selector === "button" ? this.children : []; },
+      setAttribute: function (name, value) { this.attributes[name] = String(value); },
+      getAttribute: function (name) { return this.attributes[name] || ""; },
+      setPointerCapture: function () {},
+      querySelector: function () { return this.indicator || null; },
+      getContext: function () { return context; }
+    };
+    return element;
+  }
+
+  const context = new Proxy({}, {
+    get: function (target, property) {
+      if (property === "fillText") return function (value) { textDrawn.push(String(value)); };
+      if (property in target) return target[property];
+      return function () {};
+    },
+    set: function (target, property, value) {
+      target[property] = value;
+      if (property === "fillStyle") fills.push(value);
+      return true;
+    }
+  });
+  const ids = [
+    "display", "trackList", "trackType", "stateReadout", "themeToggle", "recordToggle", "noteKeys", "drumSequenceControl", "drumSteps", "drumHardwareSteps", "recordHardwareKey", "synthHardwareKeys", "tracks", "preset", "count",
+    "cutoff", "cutoffVal", "resonance", "resonanceVal", "decay", "decayVal", "play", "next", "fxScope", "fxCategory", "fxType",
+    "fxParameter", "fxParamValue", "fxParamValueLabel", "fxParamMeta", "fxVisualIntensity", "fxVisualIntensityVal", "fxVisualHint",
+    "fxKnob", "fxKnobIndicator", "fxModeControl", "fxModeThumb", "fxPageControl", "fxUnitPresetReadout", "fxUnitPageReadout",
+    "fxStripLevel", "fxStripHighPass", "fxStripRepeater",
+    "midiChannel", "midiController", "midiValue", "midiValueLabel", "applyMidiEvent", "bpmPreview", "setBpmPreview", "bpmDownPreview",
+    "bpmUpPreview", "noteNumber", "noteVelocity", "noteOnPreview", "noteOffPreview", "eventLog", "sysexAddress", "sysexValue",
+    "applyFxEvent", "demoFxSequence"
+  ];
+  ids.forEach(function (id) {
+    const tagName = ["preset", "trackType", "fxScope", "fxCategory", "fxType", "fxParameter", "midiChannel", "midiController"].includes(id) ? "SELECT" : "DIV";
+    elements.set(id, makeElement(id, tagName));
+  });
+  const fxStripControls = ["fxLevel", "highPass", "repeater"].map(function (stripName) {
+    const strip = elements.get("fxStrip" + (stripName === "fxLevel" ? "Level" : stripName === "highPass" ? "HighPass" : "Repeater"));
+    strip.dataset.strip = stripName;
+    strip.indicator = makeElement("", "CIRCLE");
+    return strip;
+  });
+  const drumHardwareSteps = elements.get("drumHardwareSteps");
+  const svgNS = "http://www.w3.org/2000/svg";
+  const values = { fxScope: "Single", fxVisualIntensity: "65", midiValue: "64", noteNumber: "60", noteVelocity: "96", bpmPreview: "" };
+  Object.keys(values).forEach(function (id) { elements.get(id).value = values[id]; });
+  const knobs = ["all", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(function (value) {
+    const knob = makeElement("", "G"); knob.dataset.channel = String(value); return knob;
+  });
+  const soundKnob = makeElement("", "G");
+  const fxTests = ["0", "0.5", "1"].map(function (level) { const button = makeElement("", "BUTTON"); button.dataset.level = level; return button; });
+  const document = {
+    getElementById: function (id) { return elements.get(id); },
+    createElement: function (tag) { return makeElement("", tag.toUpperCase()); },
+    createElementNS: function (_ns, tag) { return makeElement("", tag.toUpperCase()); },
+    querySelectorAll: function (selector) {
+      if (selector === ".track-knob") return knobs;
+      if (selector === ".sound-knob[data-sound-knob='1']") return [soundKnob];
+      if (selector === ".fx-test") return fxTests;
+      if (selector === ".fx-touch-strip") return fxStripControls;
+      return [];
+    },
+    querySelector: function (selector) { return selector === ".sound-knob[data-sound-knob='1']" ? soundKnob : null; },
+    documentElement: { attributes: {}, setAttribute: function (name, value) { this.attributes[name] = String(value); } }
+  };
+  const sandbox = {
+    window: null,
+    document: document,
+    performance: { now: function () { return nowTime; } },
+    requestAnimationFrame: function (callback) { nextFrame = callback; },
+    addEventListener: function (name, callback) { if (name === "DOMContentLoaded") onReady = callback; },
+    SEQTRAK_CATALOG: catalog,
+    SEQTRAK_FX_SPECS: fxSpecs,
+    SEQTRAK_HARDWARE_FX_PRESETS: hardwareFxPresets,
+    SeqtrakDisplayState: stateModel,
+    SeqtrakFxModel: fxModel,
+    SeqtrakFxUnit: fxUnit,
+    SeqtrakDisplayRenderer: renderer
+  };
+  sandbox.window = sandbox;
+  vm.runInNewContext(inlineScript, sandbox, { filename: "index.html inline script" });
+  onReady();
+  function renderAt(time) { nowTime = time; nextFrame(time); }
+
+  assert.equal(elements.get("trackList").children.length, 11);
+  assert.equal(elements.get("synthHardwareKeys").children.length, 7);
+  assert.equal(elements.get("recordHardwareKey").children.length, 1);
+  assert.equal(elements.get("tracks").children.length, catalog.tracks.length);
+  assert.equal(elements.get("midiChannel").children.length, 11);
+  assert.equal(elements.get("midiController").children.length, stateModel.CC_CHOICES.length);
+  assert.ok(elements.get("fxType").children.length > 0);
+  assert.match(elements.get("fxUnitPresetReadout").textContent, /FILTER 1\/8/);
+  elements.get("fxKnob").dispatch("keydown", { key: "ArrowRight" });
+  assert.match(elements.get("fxUnitPresetReadout").textContent, /FILTER 2\/8/);
+  elements.get("fxModeControl").dispatch("click");
+  assert.equal(elements.get("fxModeControl").attributes["aria-checked"], "true");
+  assert.match(elements.get("fxUnitPresetReadout").textContent, /MASTER · FILTER 2\/8/);
+  elements.get("fxPageControl").dispatch("click");
+  assert.match(elements.get("fxUnitPageReadout").textContent, /^PAGE 2/);
+  elements.get("fxStripHighPass").dispatch("keydown", { key: "ArrowUp" });
+  assert.equal(elements.get("fxParamValueLabel").textContent, "68");
+  elements.get("fxStripHighPass").dispatch("click");
+  elements.get("fxPageControl").dispatch("click");
+  elements.get("fxStripHighPass").dispatch("keydown", { key: "ArrowUp" });
+  textDrawn.length = 0;
+  renderAt(1005);
+  assert.ok(textDrawn.includes("PERFORMANCE / ACTIVE WHILE HELD"));
+  elements.get("fxStripHighPass").dispatch("keyup", { key: "ArrowUp" });
+  textDrawn.length = 0;
+  renderAt(1010);
+  assert.equal(textDrawn.includes("PERFORMANCE / ACTIVE WHILE HELD"), false);
+  elements.get("drumHardwareSteps").children[0].dispatch("click");
+  assert.equal(elements.get("drumHardwareSteps").children[0].attributes["aria-pressed"], "true");
+  assert.equal(elements.get("drumSteps").children[0].attributes["aria-pressed"], "true");
+  knobs[0].dispatch("click");
+  assert.equal(knobs[0].attributes["aria-pressed"], "true");
+  elements.get("drumHardwareSteps").children[2].dispatch("click", { detail: 1 });
+  assert.match(elements.get("stateReadout").textContent, /ALL TRACKS · PATTERN 3 QUEUED/);
+  elements.get("drumHardwareSteps").children[2].dispatch("click", { detail: 2 });
+  assert.match(elements.get("stateReadout").textContent, /ALL TRACKS · PATTERN 3 SELECTED/);
+  knobs[0].dispatch("click");
+  assert.equal(knobs[0].attributes["aria-pressed"], "false");
+  elements.get("synthHardwareKeys").children[0].dispatch("pointerdown");
+  assert.equal(elements.get("synthHardwareKeys").children[0].classList.contains("pressed"), true);
+  elements.get("synthHardwareKeys").children[0].dispatch("pointerup");
+  assert.equal(elements.get("synthHardwareKeys").children[0].classList.contains("pressed"), false);
+  const recordKey = elements.get("recordHardwareKey").children[0];
+  recordKey.dispatch("pointerdown");
+  assert.equal(recordKey.classList.contains("pressed"), true);
+  recordKey.dispatch("pointerup");
+  recordKey.dispatch("click");
+  assert.equal(recordKey.attributes["aria-pressed"], "true");
+  assert.equal(elements.get("recordToggle").textContent, "REC ON");
+  recordKey.dispatch("click");
+  assert.equal(recordKey.attributes["aria-pressed"], "false");
+  elements.get("tracks").children.find(function (button) { return button.dataset.id === "snare"; }).dispatch("click");
+  assert.equal(elements.get("drumSteps").children.length, 16);
+  elements.get("drumSteps").children[0].dispatch("click");
+  assert.equal(elements.get("drumSteps").children[0].attributes["aria-pressed"], "true");
+  assert.ok(elements.get("preset").children.length > 1);
+  const chosenPreset = elements.get("preset").children[1].textContent;
+  elements.get("preset").value = "1";
+  elements.get("preset").dispatch("change");
+  textDrawn.length = 0;
+  renderAt(1050);
+  assert.ok(textDrawn.includes(chosenPreset));
+
+  elements.get("cutoff").value = "90";
+  elements.get("cutoff").dispatch("input");
+  textDrawn.length = 0;
+  renderAt(1100);
+  assert.ok(textDrawn.includes("FILTER CUTOFF"));
+  textDrawn.length = 0;
+  renderAt(5000);
+  assert.ok(textDrawn.includes("PATTERN 03 · 16 STEPS · PREVIEW"));
+  assert.equal(textDrawn.includes("FILTER CUTOFF"), false);
+
+  elements.get("fxType").dispatch("change");
+  textDrawn.length = 0;
+  renderAt(5100);
+  assert.ok(textDrawn.includes(elements.get("fxType").children[0].textContent));
+
+  elements.get("midiChannel").value = "1";
+  elements.get("midiController").value = "74";
+  elements.get("midiValue").value = "90";
+  elements.get("applyMidiEvent").dispatch("click");
+  assert.match(elements.get("eventLog").textContent, /FILTER CUTOFF/);
+  elements.get("bpmPreview").value = "140";
+  elements.get("setBpmPreview").dispatch("click");
+  textDrawn.length = 0;
+  renderAt(5200);
+  assert.ok(textDrawn.includes("BPM 140"));
+
+  elements.get("midiChannel").value = "8";
+  elements.get("noteOnPreview").dispatch("click");
+  textDrawn.length = 0;
+  renderAt(5300);
+  assert.ok(textDrawn.includes("C"));
+
+  elements.get("themeToggle").dispatch("click");
+  renderAt(5400);
+  assert.equal(document.documentElement.attributes["data-theme"], "dark");
+  assert.ok(fills.includes("#F5F7F5"));
+  assert.ok(fills.includes("#080A0D"));
+});
+
+test("hardware Sound Design selector matches the photographed parameter order", function () {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const list = html.match(/<g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="7\.5">([\s\S]*?)<\/g>/);
+  assert.ok(list, "Sound Design parameter list should be present");
+  const labels = Array.from(list[1].matchAll(/<text x="793" y="\d+">([^<]+)<\/text>/g), function (match) { return match[1]; });
+
+  assert.deepEqual(labels, [
+    "SOUND", "PITCH", "MONO/POLY", "CHORD", "PAN", "VOLUME", "ATTACK", "DECAY", "MICRO TIMING", "FILTER",
+    "RESONANCE", "REVERB", "DELAY", "COMP", "DISTORTION", "MODULATION", "DUCKER", "OTHER", "MIXER", "SONG"
+  ]);
+});
+
+test("FX Level, High Pass, and Repeater use separate vertical touch strips", function () {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const labels = Array.from(html.matchAll(/<text id="fxStripLabel\w+" x="(1017|1112|1242)" y="248" text-anchor="middle">([^<]+)<\/text>/g), function (match) {
+    return { x: match[1], label: match[2] };
+  });
+  const stripLines = Array.from(html.matchAll(/M(1000|1080|1210) (\d+)h(34|64)/g), function (match) {
+    return match[1];
+  });
+
+  assert.deepEqual(labels, [
+    { x: "1017", label: "FX LEVEL" },
+    { x: "1112", label: "HIGH PASS" },
+    { x: "1242", label: "REPEATER" }
+  ]);
+  assert.equal(stripLines.filter(function (x) { return x === "1000"; }).length, 8);
+  assert.equal(stripLines.filter(function (x) { return x === "1080"; }).length, 8);
+  assert.equal(stripLines.filter(function (x) { return x === "1210"; }).length, 8);
 });
 
 test("renderer draws each family and unknown MIDI tracks without throwing", function () {
@@ -368,6 +875,16 @@ test("browser controller boots, applies CC events, and keeps the legacy adapter 
   nextFrame(1020);
   assert.ok(drawText.includes("MIDI NOTES / 60"));
   assert.equal(sandbox.seqtrakNoteEvent({ type: "noteOff", channel: 1, note: 60, velocity: 0 }).ok, true);
+
+  assert.equal(sandbox.seqtrakNoteEvent({ type: "noteOn", channel: 8, note: 61, velocity: 96 }).ok, true);
+  drawText.length = 0;
+  nextFrame(1022);
+  assert.ok(drawText.includes("C#"));
+  assert.equal(drawText.includes("C#4"), false);
+  assert.equal(sandbox.seqtrakNoteEvent({ type: "noteOff", channel: 8, note: 61, velocity: 0 }).ok, true);
+  drawText.length = 0;
+  nextFrame(1024);
+  assert.equal(drawText.includes("C#"), false);
 
   sandbox.seqtrakControlChange(1, 23, 64);
   drawText.length = 0;
