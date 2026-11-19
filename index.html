@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>if (new URLSearchParams(window.location.search).get("embed") === "hardware") document.documentElement.dataset.embed = "hardware";</script>
     <title>SEQTRAK + FIELD DISPLAY · Hardware preview</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,6 +17,7 @@
     <script src="js/fx-unit.js" defer></script>
     <script src="js/pixelarticons.js" defer></script>
     <script src="js/display-renderer.js" defer></script>
+    <script src="js/midi-connection.js" defer></script>
     <style>
       :root {
         color-scheme: dark;
@@ -189,7 +191,13 @@
       .demo-card .drum-step[aria-pressed="true"] { border-color: #a44b17; background: #a44b17; color: #ffffff; }
       .demo-card details { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
       .demo-card summary { color: var(--muted); cursor: pointer; font: 10px var(--mono); }
+      .demo-card .midi-log { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+      .demo-card .midi-log-copy, .demo-card .midi-log-clear { flex: 0 0 auto !important; min-height: 28px !important; padding: 4px 8px !important; font-size: 9px !important; }
       #eventLog { max-height: 140px; margin: 12px 0 0; overflow: auto; color: var(--muted); font: 10px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+      #midiReceiveLog { grid-column: 1 / -1; max-height: 180px; margin: 8px 0 0; overflow: auto; color: var(--muted); font: 9px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+      .midi-connection-actions { display: flex; gap: 7px; margin-top: 10px; }
+      .midi-connection-status { display: block; margin-top: 8px; color: var(--muted); font: 9px/1.5 var(--mono); }
+      .midi-connection-status[data-state="listening"] { color: var(--accent); }
       @media (max-width: 1100px) { .demo-suite { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
       @media (max-width: 780px) {
         .page { padding-top: 18px; }
@@ -564,8 +572,8 @@
           row-gap: 8px;
           margin-bottom: 0;
         }
-        .header-tools { justify-self: end; align-self: start; margin: 0; }
-        .header-tools nav { gap: 12px; }
+        .header-tools { justify-self: stretch; align-self: start; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 0; }
+        .header-tools nav { flex-wrap: wrap; gap: 8px; }
         .header-tools nav a { font-size: 8px; }
         .header-tools button { font-size: 0; }
         h1 { font-size: clamp(40px, 8.2vw, 64px); }
@@ -591,6 +599,30 @@
         .display-unit { width: 90%; }
       }
     </style>
+    <style>
+      :root[data-embed="hardware"] body { min-width: 320px; }
+      :root[data-embed="hardware"] .page { width: 100%; max-width: none; margin: 0; padding: 8px clamp(8px, 1.5vw, 18px); }
+      :root[data-embed="hardware"] .page > header { display: block !important; position: relative; height: 28px; margin: 0; padding: 0; }
+      :root[data-embed="hardware"] .page > header > div:first-child,
+      :root[data-embed="hardware"] .page > header > .header-summary { display: none !important; }
+      :root[data-embed="hardware"] .header-tools { position: absolute; top: 0; right: 0; margin: 0; }
+      :root[data-embed="hardware"] .header-tools nav { display: none; }
+      :root[data-embed="hardware"] .header-tools button { min-width: 64px; min-height: 26px; }
+      :root[data-embed="hardware"] main > *:not(#hardware-view) { display: none !important; }
+      :root[data-embed="hardware"] #hardware-view { grid-template-columns: minmax(220px, 330px) minmax(0, 1fr); align-items: center; gap: clamp(14px, 2.5vw, 32px); min-height: 0; margin: 0; padding: 8px 0; border: 0; overflow: visible; }
+      :root[data-embed="hardware"] .display-unit { max-width: 330px; }
+      :root[data-embed="hardware"] .device-wrap { width: 100%; min-width: 0; margin: 0; overflow: visible; }
+      :root[data-embed="hardware"] .device-svg { width: 100%; min-width: 0; }
+      :root[data-embed="hardware"] .unit-label, :root[data-embed="hardware"] .device-caption { margin-bottom: 6px; padding-bottom: 0; border: 0; }
+      :root[data-embed="hardware"] .fx-unit-readout { gap: 4px 10px; margin: 0; padding: 4px 0; border: 0; font-size: 8px; }
+      @media (max-width: 780px) {
+        :root[data-embed="hardware"] .page { padding: 8px 12px; }
+        :root[data-embed="hardware"] #hardware-view { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 4px 0; }
+        :root[data-embed="hardware"] .display-unit { width: min(100%, 330px); max-width: 330px; margin: 0; }
+        :root[data-embed="hardware"] .device-wrap { width: 100%; overflow-x: auto; }
+        :root[data-embed="hardware"] .device-svg { min-width: 760px; }
+      }
+    </style>
   </head>
   <body>
     <div class="page">
@@ -604,6 +636,7 @@
             <a href="#hardware-view">Overview</a>
             <a href="#preview-controls">Simulator</a>
             <a href="#sound-design">Sound + FX</a>
+            <a href="live-monitor.html">LIVE MONITOR</a>
           </nav>
           <button id="themeToggle" type="button" aria-label="Switch to dark mode" aria-pressed="true">Switch to dark mode</button>
         </div>
@@ -630,19 +663,19 @@
               <rect x="8" y="8" width="1376" height="382" rx="17" fill="url(#body)" stroke="none"/>
               <rect x="22" y="23" width="42" height="350" rx="5" fill="#d4d6d7" stroke="#686d70"/>
               <g fill="#24282a" font-family="IBM Plex Mono, monospace" font-size="8" text-anchor="middle">
-                <text transform="translate(43 58) rotate(-90)">VOL +</text><text transform="translate(43 92) rotate(-90)">VOL -</text>
-                <text transform="translate(43 132) rotate(-90)">DELETE</text><text transform="translate(43 172) rotate(-90)">MUTE</text>
-                <text transform="translate(43 212) rotate(-90)">SOLO</text><text transform="translate(43 252) rotate(-90)">PAGE</text>
+                <text transform="translate(43 53) rotate(-90)">VOL +</text><text transform="translate(43 93) rotate(-90)">VOL -</text>
+                <text transform="translate(43 133) rotate(-90)">DELETE</text><text transform="translate(43 173) rotate(-90)">MUTE</text>
+                <text transform="translate(43 213) rotate(-90)">SOLO</text><text transform="translate(43 253) rotate(-90)">PAGE</text>
                 <text transform="translate(43 294) rotate(-90)">PLAY</text>
               </g>
               <g aria-label="Left-side hardware button hit areas">
                 <rect id="sideVolumeUp" class="hardware-side-control" data-side-action="volume-up" x="25" y="38" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Master volume up button" aria-pressed="false"/>
-                <rect id="sideVolumeDown" class="hardware-side-control" data-side-action="volume-down" x="25" y="72" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Master volume down button" aria-pressed="false"/>
-                <rect id="sideDelete" class="hardware-side-control" data-side-action="delete" x="25" y="116" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Delete button. Hold while pressing a target control." aria-pressed="false"/>
-                <rect id="sideMute" class="hardware-side-control" data-side-action="mute" x="25" y="156" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Mute button. Hold while pressing a track knob." aria-pressed="false"/>
-                <rect id="sideSolo" class="hardware-side-control" data-side-action="solo" x="25" y="196" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Solo button. Hold while pressing a track knob." aria-pressed="false"/>
-                <rect id="sidePage" class="hardware-side-control" data-side-action="page" x="25" y="236" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Page button" aria-pressed="false"/>
-                <rect id="sidePlay" class="hardware-side-control" data-side-action="play" x="25" y="276" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Play or stop the sequence preview" aria-pressed="false"/>
+                <rect id="sideVolumeDown" class="hardware-side-control" data-side-action="volume-down" x="25" y="78" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Master volume down button" aria-pressed="false"/>
+                <rect id="sideDelete" class="hardware-side-control" data-side-action="delete" x="25" y="118" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Delete button. Tap, then choose a target control." aria-pressed="false"/>
+                <rect id="sideMute" class="hardware-side-control" data-side-action="mute" x="25" y="158" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Mute mode. Tap to toggle, then tap track knobs." aria-pressed="false"/>
+                <rect id="sideSolo" class="hardware-side-control" data-side-action="solo" x="25" y="198" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Solo button. Tap, then choose a track knob." aria-pressed="false"/>
+                <rect id="sidePage" class="hardware-side-control" data-side-action="page" x="25" y="238" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="FX page button" aria-pressed="false"/>
+                <rect id="sidePlay" class="hardware-side-control" data-side-action="play" x="25" y="278" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Play or stop the sequence preview" aria-pressed="false"/>
               </g>
               <rect x="70" y="23" width="470" height="210" rx="5" fill="#eceeed" stroke="#8b9092"/>
               <rect x="548" y="23" width="218" height="210" rx="5" fill="#e4e6e5" stroke="#8b9092"/>
@@ -696,26 +729,26 @@
               <g id="drumHardwareSteps" aria-label="Toggle the 16 preview drum sequence steps"></g>
               <g id="recordHardwareKey" aria-label="Toggle the preview recording state"></g>
               <g id="synthHardwareKeys" aria-label="Seven simulated Synth performance keys"></g>
-              <rect x="778" y="23" width="269" height="350" rx="5" fill="#d7d9d9" stroke="#777d80"/>
-              <rect x="1047" y="23" width="260" height="205" rx="5" fill="#d7d9d9" stroke="#777d80"/>
+              <rect x="778" y="23" width="289" height="350" rx="5" fill="#d7d9d9" stroke="#777d80"/>
+              <rect x="1067" y="23" width="240" height="205" rx="5" fill="#d7d9d9" stroke="#777d80"/>
               <g fill="#d1d3d3" stroke="#8a8f91" stroke-width="1">
-                <rect x="987" y="235" width="60" height="138"/>
-                <rect x="1047" y="235" width="130" height="138"/>
-                <rect x="1177" y="235" width="130" height="138"/>
+                <rect x="987" y="235" width="80" height="138"/>
+                <rect x="1067" y="235" width="120" height="138"/>
+                <rect x="1187" y="235" width="120" height="138"/>
               </g>
-              <rect x="1058" y="34" width="238" height="184" fill="url(#micGrid)"/>
+              <rect x="1078" y="34" width="218" height="184" fill="url(#micGrid)"/>
               <rect x="1307" y="23" width="69" height="350" rx="4" fill="#d1d3d3" stroke="#777d80"/>
               <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="6.5" text-anchor="middle">
                 <text transform="translate(1341 48) rotate(90)">USB</text><text transform="translate(1341 84) rotate(90)">PHONES</text>
                 <text transform="translate(1341 120) rotate(90)">AUDIO IN</text><text transform="translate(1341 156) rotate(90)">MIDI</text>
-                <text transform="translate(1341 192) rotate(90)">BPM +</text><text transform="translate(1341 228) rotate(90)">BPM −</text>
-                <text transform="translate(1341 264) rotate(90)">SWING</text><text transform="translate(1341 300) rotate(90)">PROJECT ↑</text>
+                <text transform="translate(1341 188) rotate(90)">BPM +</text><text transform="translate(1341 228) rotate(90)">BPM −</text>
+                <text transform="translate(1341 268) rotate(90)">SWING</text><text transform="translate(1341 308) rotate(90)">PROJECT ↑</text>
               </g>
               <g aria-label="Right-side hardware button hit areas">
-                <rect id="sideBpmUp" class="hardware-side-control" data-side-action="bpm-up" x="1310" y="176" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="BPM up button" aria-pressed="false"/>
+                <rect id="sideBpmUp" class="hardware-side-control" data-side-action="bpm-up" x="1310" y="172" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="BPM up button" aria-pressed="false"/>
                 <rect id="sideBpmDown" class="hardware-side-control" data-side-action="bpm-down" x="1310" y="212" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="BPM down button" aria-pressed="false"/>
-                <rect id="sideSwing" class="hardware-side-control" data-side-action="swing" x="1310" y="248" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Swing button" aria-pressed="false"/>
-                <rect id="sideProject" class="hardware-side-control" data-side-action="project" x="1310" y="284" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Project up button. Hold while pressing Drum keys 1 to 8." aria-pressed="false"/>
+                <rect id="sideSwing" class="hardware-side-control" data-side-action="swing" x="1310" y="252" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Swing button. Tap, then rotate ALL; swing value is unavailable in this preview." aria-pressed="false"/>
+                <rect id="sideProject" class="hardware-side-control" data-side-action="project" x="1310" y="292" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Project up button. Tap, then press Drum keys 1 to 8." aria-pressed="false"/>
               </g>
               <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="7.5">
                 <text x="793" y="43">SOUND</text><text x="793" y="59">PITCH</text><text x="793" y="75">MONO/POLY</text><text x="793" y="91">CHORD</text>
@@ -732,10 +765,10 @@
                 <circle cx="854" cy="296" r="2.1"/><circle cx="854" cy="312" r="2.1"/>
               </g>
               <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="6">
-                <text x="1017" y="43" text-anchor="middle">FX</text>
-                <text x="895" y="344" text-anchor="middle">PAGE / PARAMETER</text><text x="1017" y="198" text-anchor="middle">MASTER / SINGLE</text>
-                <text id="fxStripLabelLevel" x="1017" y="248" text-anchor="middle">FX LEVEL</text><text id="fxStripLabelHighPass" x="1112" y="248" text-anchor="middle">HIGH PASS</text><text id="fxStripLabelRepeater" x="1242" y="248" text-anchor="middle">REPEATER</text>
-                <text x="1177" y="43" text-anchor="middle">MIC</text>
+                <text x="1027" y="43" text-anchor="middle">FX</text>
+                <text x="895" y="344" text-anchor="middle">PAGE / PARAMETER</text><text x="1027" y="198" text-anchor="middle">MASTER / SINGLE</text>
+                <text id="fxStripLabelLevel" x="1027" y="248" text-anchor="middle">FX LEVEL</text><text id="fxStripLabelHighPass" x="1127" y="248" text-anchor="middle">HIGH PASS</text><text id="fxStripLabelRepeater" x="1247" y="248" text-anchor="middle">REPEATER</text>
+                <text x="1187" y="43" text-anchor="middle">MIC</text>
               </g>
               <g class="sound-knob" data-sound-knob="1" tabindex="0" role="button" aria-label="Sound Design knob 1, change the selected track sound">
                 <circle cx="895" cy="75" r="25" fill="#d6d8d8" stroke="#565c5f" stroke-width="1.5"/><circle cx="895" cy="75" r="19" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/><path d="M895 57v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
@@ -743,30 +776,30 @@
               <g fill="url(#knob)" stroke="#565c5f" stroke-width="2">
                 <circle cx="895" cy="132" r="19"/><circle cx="895" cy="189" r="19"/><circle cx="895" cy="246" r="19"/>
               </g>
-              <g id="fxKnob" class="fx-rotary" tabindex="0" role="button" aria-label="FX knob. Rotate to select one of the documented SEQTRAK effect presets.">
-                <circle cx="1017" cy="82" r="23" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/>
-                <path id="fxKnobIndicator" d="M1017 62v9" stroke="#596064" stroke-width="2.5" stroke-linecap="round"/>
+              <g id="fxKnob" class="fx-rotary" tabindex="0" role="button" aria-label="FX knob. Rotate to select an effect preset; hold a track knob while rotating to select that track's sound.">
+                <circle cx="1027" cy="82" r="23" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/>
+                <path id="fxKnobIndicator" d="M1027 62v9" stroke="#596064" stroke-width="2.5" stroke-linecap="round"/>
               </g>
               <g id="fxModeControl" class="fx-mode-control" tabindex="0" role="switch" aria-label="MASTER/SINGLE effect target" aria-checked="false">
-                <rect class="fx-mode-track" x="987" y="169" width="60" height="11" rx="5.5" fill="#9da2a4" stroke="#555b5d"/>
-                <circle id="fxModeThumb" cx="1033" cy="174.5" r="4.5" fill="#f4f4f2" stroke="#555b5d"/>
+                <rect class="fx-mode-track" x="991" y="168" width="72" height="13" rx="6.5" fill="#9da2a4" stroke="#555b5d"/>
+                <circle id="fxModeThumb" cx="1053" cy="174.5" r="5.5" fill="#f4f4f2" stroke="#555b5d"/>
               </g>
               <g stroke="#73797b" stroke-width="2" stroke-linecap="round">
-                <path d="M1000 264h34 M1000 276h34 M1000 288h34 M1000 300h34 M1000 312h34 M1000 324h34 M1000 336h34 M1000 348h34"/>
-                <path d="M1080 264h64 M1080 276h64 M1080 288h64 M1080 300h64 M1080 312h64 M1080 324h64 M1080 336h64 M1080 348h64"/>
-                <path d="M1210 264h64 M1210 276h64 M1210 288h64 M1210 300h64 M1210 312h64 M1210 324h64 M1210 336h64 M1210 348h64"/>
+                <path d="M1000 264h54 M1000 276h54 M1000 288h54 M1000 300h54 M1000 312h54 M1000 324h54 M1000 336h54 M1000 348h54"/>
+                <path d="M1095 264h64 M1095 276h64 M1095 288h64 M1095 300h64 M1095 312h64 M1095 324h64 M1095 336h64 M1095 348h64"/>
+                <path d="M1215 264h64 M1215 276h64 M1215 288h64 M1215 300h64 M1215 312h64 M1215 324h64 M1215 336h64 M1215 348h64"/>
               </g>
               <g id="fxStripLevel" class="fx-touch-strip" data-strip="fxLevel" tabindex="0" role="slider" aria-orientation="vertical" aria-label="FX Level touch strip" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64">
-                <rect class="fx-strip-hit" x="989" y="258" width="56" height="105" rx="2"/>
-                <circle class="fx-touch-indicator" cx="1017" cy="310" r="4"/>
+                <rect class="fx-strip-hit" x="989" y="258" width="76" height="105" rx="2"/>
+                <circle class="fx-touch-indicator" cx="1027" cy="310" r="4"/>
               </g>
               <g id="fxStripHighPass" class="fx-touch-strip" data-strip="highPass" tabindex="0" role="slider" aria-orientation="vertical" aria-label="High Pass touch strip" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0">
-                <rect class="fx-strip-hit" x="1049" y="258" width="126" height="105" rx="2"/>
-                <circle class="fx-touch-indicator" cx="1112" cy="358" r="4"/>
+                <rect class="fx-strip-hit" x="1069" y="258" width="116" height="105" rx="2"/>
+                <circle class="fx-touch-indicator" cx="1127" cy="358" r="4"/>
               </g>
               <g id="fxStripRepeater" class="fx-touch-strip" data-strip="repeater" tabindex="0" role="slider" aria-orientation="vertical" aria-label="Repeater touch strip" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0">
-                <rect class="fx-strip-hit" x="1179" y="258" width="126" height="105" rx="2"/>
-                <circle class="fx-touch-indicator" cx="1242" cy="358" r="4"/>
+                <rect class="fx-strip-hit" x="1189" y="258" width="116" height="105" rx="2"/>
+                <circle class="fx-touch-indicator" cx="1247" cy="358" r="4"/>
               </g>
             </svg>
           </div>
@@ -779,7 +812,7 @@
 
         <section id="preview-controls" class="controls" aria-label="Preview controls">
           <div>
-            <label class="field-label" for="trackList">PREVIEW TRACK · 11 MIDI CHANNELS</label>
+            <label class="field-label" for="trackList">TRACK · 11 MIDI CHANNELS</label>
             <div id="trackList" class="track-list"></div>
           </div>
           <div class="type-control">
@@ -791,7 +824,7 @@
             <button id="recordToggle" class="record-toggle" type="button" aria-pressed="false">REC OFF</button>
           </div>
           <div class="key-control">
-            <span class="field-label">MIDI NOTE INPUT · SIMULATED EVENT (60–71)</span>
+            <span class="field-label">MIDI NOTE INPUT · PREVIEW EVENT (60–71)</span>
             <div id="noteKeys" class="note-keys" aria-label="Hold a simulated MIDI note event to preview its pitch class"></div>
           </div>
           <div id="stateReadout" class="state-readout" aria-live="polite"></div>
@@ -844,8 +877,14 @@
           </section>
 
           <section class="demo-card">
-            <h2>DOCUMENTED MIDI CC / PERFORMANCE DEMO</h2>
-            <p class="help">The event controls use documented channels, CC numbers, and ranges. Track Volume CC 7 is separate from the side VOL + / VOL − controls. MUTE / SOLO CCs do not report physical button presses. This page does not connect to or send data to MIDI hardware.</p>
+            <h2>USB MIDI · RECEIVE ONLY</h2>
+            <p class="help">Connect a MIDI input in Chrome to receive Note, CC, Program Change, and SysEx messages. Documented CCs update the display; Program Change and unknown SysEx are logged without guessing sound names or decoding unverified data. This page never sends MIDI.</p>
+            <div class="midi-connection-actions"><button id="midiConnect" type="button">CONNECT MIDI</button><button id="midiDisconnect" type="button" disabled>DISCONNECT</button></div>
+            <label for="midiInputSelect"><span>MIDI INPUT PORT</span></label><select id="midiInputSelect" disabled><option value="">Connect MIDI to list input ports</option></select>
+            <span id="midiConnectionStatus" class="midi-connection-status" role="status">Not connected. Use Chrome on HTTPS or localhost.</span>
+            <details class="midi-log"><summary>RECEIVED MESSAGE LOG</summary><button id="midiLogCopy" class="midi-log-copy" type="button" data-copy-target="midiReceiveLog" aria-label="Copy received MIDI log">COPY LOG</button><button id="midiLogClear" class="midi-log-clear" type="button" data-clear-target="midiReceiveLog" aria-label="Clear received MIDI log">CLEAR LOG</button><pre id="midiReceiveLog" aria-live="polite">No MIDI messages received.</pre></details>
+            <h2 style="margin-top:20px">DOCUMENTED MIDI CC / PERFORMANCE DEMO</h2>
+            <p class="help">These manual controls remain available without a MIDI device. Track Volume CC 7 is separate from the side VOL + / VOL − controls. MUTE / SOLO CC values do not identify physical button presses.</p>
             <label for="midiChannel"><span>MIDI CHANNEL</span></label><select id="midiChannel"></select>
             <label for="midiController"><span>CONTROL CHANGE</span></label><select id="midiController"></select>
             <label for="midiValue"><span>VALUE</span><output id="midiValueLabel">64</output></label><input id="midiValue" type="range" min="0" max="127" value="64">
@@ -874,7 +913,7 @@
             <a class="statement-link" href="#preview-controls">EXPLORE THE SIMULATOR</a>
           </div>
         </section>
-        <p class="note">Drag or scroll the FX knob to cycle the documented 8-category effect presets. Click MASTER/SINGLE to change the target and use the simulator FX Page control below the hardware drawing to switch parameter assignments. Drag a touch strip to adjust its assigned value. On Page 1, HIGH PASS and REPEATER stay active only while pressed and bypass on release. Click the 16 Drum-section pads to toggle preview steps; they update the display and step grid below. Hold ALL while pressing Drum keys 1–6 to queue the same pattern for all 11 tracks; double-tap a Drum key while holding ALL to switch immediately. These controls are simulations only and produce no audio or hardware connection. Drum-section pads are sequence controls; Synth-section keys perform notes. The sounding Synth note depends on the selected track and its Scale, Key, and Octave settings, so this page's C4–B4 buttons simulate MIDI note events and do not claim a physical-key mapping. REC and note controls are simulations only: this page does not connect to SEQTRAK or detect recording state. DrumKit uses a neutral symbol when its active sound is unknown.</p>
+        <p class="note">Drag or scroll the FX knob to cycle the documented 8-category effect presets. Hold a track knob while rotating FX to step through that track's sound presets; the selected sound name appears on the external display and in the sound preset control below. Click MASTER/SINGLE to change the effect target and use the simulator FX Page control below the hardware drawing to switch parameter assignments. Drag a touch strip to adjust its assigned value. On Page 1, HIGH PASS and REPEATER stay active only while pressed and bypass on release. Click the 16 Drum-section pads to toggle preview steps; they update the display and step grid below. Hold ALL while pressing Drum keys 1–6 to queue the same pattern for all 11 tracks; double-tap a Drum key while holding ALL to switch immediately. These hardware controls remain simulations and produce no audio. When you connect a MIDI input, this page receives messages only: documented CC values and Note activity can update the display, while Program Change and unknown SysEx are logged without guessed sound names or unverified decoding. Drum-section pads are sequence controls; Synth-section keys perform notes. The sounding Synth note depends on the selected track and its Scale, Key, and Octave settings, so this page's C4–B4 buttons simulate note events and do not claim a physical-key mapping. Recording, saved patterns, and unconfirmed hardware states are not inferred. DrumKit uses a neutral symbol when its active sound is unknown.</p>
       </main>
     </div>
 
@@ -908,29 +947,41 @@
         const fxPageControl = document.getElementById("fxPageControl");
         const fxStripControls = Array.from(document.querySelectorAll(".fx-touch-strip"));
         const hardwareSideControls = Array.from(document.querySelectorAll(".hardware-side-control"));
+        const embeddedHardware = document.documentElement.dataset.embed === "hardware";
         const patterns = {};
         const queuedPatterns = {};
         const soundIndexes = {};
+        const soundValuesByChannel = {};
         const drumSequences = {};
+        const capturedDrumSequences = {};
+        const capturedDrumKnown = {};
         let theme = "light";
         let channel = 1;
         let trackType = "Drum";
         let allPatternMode = false;
         let muteMode = false;
         let muteButtonHeld = false;
+        let soloButtonLatched = false;
         let soloButtonHeld = false;
+        let deleteButtonLatched = false;
         let deleteButtonHeld = false;
+        let projectButtonLatched = false;
         let projectButtonHeld = false;
+        let swingButtonLatched = false;
         let swingButtonHeld = false;
         let familyOverride = null;
         let recording = false;
         let fxUnitMode = "Single";
         let fxUnitPage = 1;
         let hardwareFxPresetIndex = 0;
+        let heldSoundTrackChannel = null;
         let state = Model.createInitialState();
         state.playing = false;
+        let previewMasterVolume = 64;
         let playheadStep = null;
         let lastPlaybackTime = 0;
+        let lastRealtimeLogAt = 0;
+        let suppressedRealtimeCount = 0;
 
         ctx.setTransform(4, 0, 0, 4, 0, 0);
 
@@ -977,6 +1028,12 @@
           return drumSequences[targetChannel][patternNumber];
         }
 
+        function capturedDrumSequenceFor(targetChannel) {
+          if (!capturedDrumSequences[targetChannel]) capturedDrumSequences[targetChannel] = Array.from({ length: 16 }, function () { return false; });
+          if (!capturedDrumKnown[targetChannel]) capturedDrumKnown[targetChannel] = Array.from({ length: 16 }, function () { return false; });
+          return capturedDrumSequences[targetChannel];
+        }
+
         function syncTrackSelection() {
           trackKnobs.forEach(function (knob) {
             const isAllKnob = knob.dataset.channel === "all";
@@ -1019,8 +1076,9 @@
           muteMode = Boolean(enabled);
           if (muteMode) allPatternMode = false;
           syncTrackSelection();
+          syncSideButtonState("mute");
           stateReadout.textContent = muteMode
-            ? "MUTE MODE · PRESS TRACK KNOBS TO MUTE / UNMUTE"
+            ? "MUTE MODE · TAP TRACK KNOBS TO MUTE / UNMUTE · TAP MUTE TO EXIT"
             : "MUTE MODE OFF";
         }
 
@@ -1043,10 +1101,63 @@
           stateReadout.innerHTML = '<svg class="state-readout-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="' + pathData + '"></path></svg><span>' + safeMessage + "</span>";
         }
 
+        function currentFxStripMapping(stripName, page) {
+          return FxUnit.stripMapping(page === undefined ? fxUnitPage : page, stripName, state.fx.effect);
+        }
+
+        function adjustPreviewMasterVolume(direction) {
+          previewMasterVolume = Math.max(0, Math.min(127, previewMasterVolume + direction));
+          state = Object.assign({}, state, {
+            masterVolumeDisplay: String(previewMasterVolume) + " · PREVIEW",
+            currentParameter: {
+              key: "masterVolume",
+              name: "MASTER VOLUME · PREVIEW",
+              value: previewMasterVolume,
+              min: 0,
+              max: 127
+            },
+            view: "parameter",
+            until: performance.now() + 2400
+          });
+          setSideActionReadout("volume", "MASTER VOL " + previewMasterVolume + " · PREVIEW ONLY");
+        }
+
+        function syncSideButtonState(action) {
+          const control = hardwareSideControls.find(function (item) { return item.dataset.sideAction === action; });
+          if (!control) return;
+          const pressed = action === "mute" ? muteMode || muteButtonHeld
+            : action === "solo" ? soloButtonHeld || soloButtonLatched
+            : action === "delete" ? deleteButtonHeld || deleteButtonLatched
+            : action === "project" ? projectButtonHeld || projectButtonLatched
+            : action === "swing" ? swingButtonHeld || swingButtonLatched
+            : action === "page" ? fxUnitPage === 2
+            : action === "play" ? state.playing : false;
+          control.setAttribute("aria-pressed", String(pressed));
+          control.classList.toggle("held", pressed);
+        }
+
+        function clearSideLatch(action) {
+          if (action === "solo") soloButtonLatched = false;
+          else if (action === "delete") deleteButtonLatched = false;
+          else if (action === "project") projectButtonLatched = false;
+          else if (action === "swing") swingButtonLatched = false;
+          syncSideButtonState(action);
+        }
+
+        function reportSwingUnavailable() {
+          stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+          if (swingButtonLatched) clearSideLatch("swing");
+        }
+
         function handleTrackKnobAction(target) {
           if (target === "all") return false;
-          const action = muteMode || muteButtonHeld ? "mute" : soloButtonHeld ? "solo" : deleteButtonHeld ? "delete" : null;
+          const action = muteMode || muteButtonHeld ? "mute" : soloButtonHeld || soloButtonLatched ? "solo" : deleteButtonHeld || deleteButtonLatched ? "delete" : null;
           if (!action) return false;
+          const sideControl = hardwareSideControls.find(function (control) { return control.dataset.sideAction === action; });
+          const heldAction = action === "mute" ? muteButtonHeld && !muteMode
+            : action === "solo" ? soloButtonHeld
+            : deleteButtonHeld;
+          if (sideControl && heldAction) sideControl.dataset.skipClick = "true";
           chooseChannel(target);
           if (action === "mute") {
             const muteByChannel = Object.assign({}, state.muteByChannel);
@@ -1059,16 +1170,16 @@
             state = Object.assign({}, state, { soloTrack: soloTrack, view: "overview", until: 0 });
             syncPreviewControls();
             stateReadout.textContent = soloTrack === null ? "SOLO OFF" : "SOLO TRACK " + target;
+            clearSideLatch("solo");
           } else {
             stateReadout.textContent = "DELETE + TRACK KNOB · PATTERN DATA IS NOT LOADED IN THIS PREVIEW";
+            clearSideLatch("delete");
           }
           return true;
         }
 
         function setSideButtonHeld(control, pressed) {
           const action = control.dataset.sideAction;
-          control.classList.toggle("held", Boolean(pressed));
-          control.setAttribute("aria-pressed", String(Boolean(pressed)));
           if (action === "mute") {
             if (pressed) {
               if (allPatternMode) {
@@ -1086,6 +1197,7 @@
             projectButtonHeld = Boolean(pressed);
             syncHardwareDrumPads();
           } else if (action === "swing") swingButtonHeld = Boolean(pressed);
+          syncSideButtonState(action);
         }
 
         function activateSideButton(control) {
@@ -1100,25 +1212,57 @@
             if (state.bpm === null) stateReadout.textContent = "BPM UNKNOWN · SET A PREVIEW BPM BEFORE USING BPM + / −";
             else applyBpm(state.bpm + (action === "bpm-up" ? 1 : -1), "preview");
           } else if (action === "volume-up" || action === "volume-down") {
-            setSideActionReadout("volume", "MASTER VOL " + (action === "volume-up" ? "+" : "−") + " PRESSED · CURRENT LEVEL UNAVAILABLE");
+            adjustPreviewMasterVolume(action === "volume-up" ? 1 : -1);
           } else if (action === "mute") {
-            setSideActionReadout("mic-off", "HOLD MUTE WHILE PRESSING A TRACK KNOB, OR HOLD ALL + MUTE TO ENTER MUTE MODE");
+            setMuteMode(!muteMode);
           } else if (action === "solo") {
-            stateReadout.textContent = "HOLD SOLO WHILE PRESSING A TRACK KNOB";
+            soloButtonLatched = !soloButtonLatched;
+            syncSideButtonState("solo");
+            stateReadout.textContent = soloButtonLatched ? "SOLO READY · TAP A TRACK KNOB" : "SOLO CANCELLED";
           } else if (action === "delete") {
-            stateReadout.textContent = "HOLD DELETE WHILE PRESSING A TARGET · PREVIEW DATA WILL NOT BE DELETED";
+            deleteButtonLatched = !deleteButtonLatched;
+            syncSideButtonState("delete");
+            stateReadout.textContent = deleteButtonLatched ? "DELETE READY · TAP A TARGET · PREVIEW DATA WILL NOT BE DELETED" : "DELETE CANCELLED";
           } else if (action === "page") {
-            stateReadout.textContent = "PAGE · THIS PREVIEW CONTAINS ONE 16-STEP PAGE";
+            toggleFxUnitPage();
+            stateReadout.textContent = "FX PAGE " + fxUnitPage;
           } else if (action === "swing") {
-            stateReadout.textContent = "SWING · VALUE NOT AVAILABLE IN THIS PREVIEW";
+            swingButtonLatched = !swingButtonLatched;
+            syncSideButtonState("swing");
+            stateReadout.textContent = swingButtonLatched ? "SWING READY · ADJUST WITH ALL KNOB · VALUE NOT AVAILABLE" : "SWING CANCELLED";
           } else if (action === "project") {
-            stateReadout.textContent = "HOLD PROJECT ↑ WHILE PRESSING DRUM KEYS 1–8 · PROJECT DATA NOT LOADED";
+            projectButtonLatched = !projectButtonLatched;
+            syncHardwareDrumPads();
+            syncSideButtonState("project");
+            stateReadout.textContent = projectButtonLatched ? "PROJECT SLOT READY · TAP DRUM KEY 1–8 · PROJECT DATA NOT LOADED" : "PROJECT SELECTION CANCELLED";
           }
+        }
+
+        function handleDrumHardwarePad(index, event) {
+          if (projectButtonHeld || projectButtonLatched) {
+            stateReadout.textContent = index < 8
+              ? "PROJECT SLOT " + (index + 1) + " REQUESTED · PROJECT CONTENT NOT LOADED"
+              : "PROJECT SELECTION USES DRUM KEYS 1–8";
+            if (projectButtonLatched) {
+              clearSideLatch("project");
+              syncHardwareDrumPads();
+            }
+            return;
+          }
+          if (deleteButtonHeld || deleteButtonLatched) {
+            stateReadout.textContent = "DELETE + DRUM KEY · TARGET DATA IS NOT LOADED IN THIS PREVIEW";
+            if (deleteButtonLatched) clearSideLatch("delete");
+            return;
+          }
+          if (allPatternMode) {
+            if (index < 6) setAllTrackPattern(index + 1, Number(event.detail) < 2);
+            return;
+          }
+          toggleDrumStep(index);
         }
 
         hardwareSideControls.forEach(function (control) {
           control.addEventListener("pointerdown", function (event) {
-            event.preventDefault();
             control.setPointerCapture(event.pointerId);
             setSideButtonHeld(control, true);
           });
@@ -1126,12 +1270,20 @@
           control.addEventListener("pointercancel", function () { setSideButtonHeld(control, false); });
           control.addEventListener("keydown", function (event) {
             if (event.key === "Enter" || event.key === " ") {
+              if (event.repeat) return;
               event.preventDefault();
               setSideButtonHeld(control, true);
+              activateSideButton(control);
             }
           });
           control.addEventListener("keyup", function (event) {
-            if (event.key === "Enter" || event.key === " ") setSideButtonHeld(control, false);
+            if (event.key !== "Enter" && event.key !== " ") return;
+            setSideButtonHeld(control, false);
+            if (control.dataset.skipClick === "true") {
+              delete control.dataset.skipClick;
+              return;
+            }
+            activateSideButton(control);
           });
           control.addEventListener("blur", function () { setSideButtonHeld(control, false); });
           control.addEventListener("click", function () { activateSideButton(control); });
@@ -1153,6 +1305,7 @@
           }
           refreshPreviewReadout();
           stateReadout.textContent = "ALL TRACKS · PATTERN " + patternNumber + (queued ? " QUEUED" : " SELECTED");
+          focusPlaybackDetail("overview");
         }
 
         function syncMidiChannelSelection() {
@@ -1198,6 +1351,14 @@
           const deviceTrack = Model.MIDI_TRACKS[channel];
           const currentPattern = patterns[channel] || 1;
           const queuedPattern = queuedPatterns[channel];
+          if (familyOverride === null && Object.prototype.hasOwnProperty.call(soundValuesByChannel, channel)) {
+            const trackName = deviceTrack.name
+              .replace(/\s*\/\s*(DRUM|SYNTH|DX|SAMPLER)$/i, "")
+              .replace(/\b(HAT|PERC|SYNTH)\s+(\d+)\b/gi, "$1$2");
+            stateReadout.textContent = trackName + " / VALUE " + soundValuesByChannel[channel] + " · SOUND NAME UNKNOWN" + (recording ? " · REC" : "");
+            syncTrackSelection();
+            return;
+          }
           stateReadout.textContent = "CH " + String(channel).padStart(2, "0") + " · " + deviceTrack.name + " · " + trackType.toUpperCase() + " · PATTERN " + currentPattern + (queuedPattern ? " → " + queuedPattern + " QUEUED" : "") + (recording ? " · REC" : "");
           syncTrackSelection();
         }
@@ -1214,14 +1375,16 @@
           if (sidePlay) {
             sidePlay.setAttribute("aria-pressed", String(state.playing));
             sidePlay.setAttribute("aria-label", state.playing ? "Stop the sequence preview" : "Play the sequence preview");
+            syncSideButtonState("play");
           }
         }
 
         function setSequencePlaying(playing) {
           const next = Boolean(playing);
           if (next && state.bpm === null) {
-            stateReadout.textContent = "BPM UNKNOWN · SET A PREVIEW BPM TO PLAY";
-            return false;
+            state.bpm = 120;
+            state.bpmSource = "preview";
+            syncPerformanceControls();
           }
           if (next === state.playing) return true;
           state.playing = next;
@@ -1232,9 +1395,15 @@
             playheadStep = null;
             lastPlaybackTime = 0;
           }
+          if (next) state.playbackFocus = false;
+          state.playbackOverview = !state.playbackFocus
+            && (next || Model.midiPlaybackActive(state.midiPlayback, performance.now()));
+          state.previewPlayheadStep = next ? playheadStep : null;
           syncPerformanceControls();
           syncDrumSteps();
-          stateReadout.textContent = next ? "SEQUENCE PLAYING · STEP 01/16" : "SEQUENCE STOPPED";
+          stateReadout.textContent = next
+            ? "SEQUENCE PLAYING · " + (state.bpmSource === "preview" ? "PREVIEW " : "") + state.bpm + " BPM · STEP 01/16"
+            : "SEQUENCE STOPPED";
           return true;
         }
 
@@ -1243,10 +1412,21 @@
           const stepDuration = 60000 / (Number(state.bpm) * 4);
           if (!Number.isFinite(stepDuration) || stepDuration <= 0) return;
           const elapsedSteps = Math.floor((Number(time) - lastPlaybackTime) / stepDuration);
-          if (elapsedSteps < 1) return;
-          playheadStep = (playheadStep + elapsedSteps) % 16;
-          lastPlaybackTime += elapsedSteps * stepDuration;
-          syncDrumSteps();
+          if (elapsedSteps >= 1) {
+            playheadStep = (playheadStep + elapsedSteps) % 16;
+            lastPlaybackTime += elapsedSteps * stepDuration;
+            syncDrumSteps();
+          }
+          state.previewPlayheadStep = playheadStep;
+        }
+
+        function focusPlaybackDetail(view) {
+          if (!state.playing && !Model.midiPlaybackActive(state.midiPlayback, performance.now())) return false;
+          state.playbackFocus = true;
+          state.playbackOverview = false;
+          if (view) state.view = view;
+          state.until = 0;
+          return true;
         }
 
         function syncDrumSteps() {
@@ -1305,37 +1485,11 @@
             indicator.setAttribute("height", "4");
             indicator.setAttribute("rx", "2");
             group.append(hit, indicator);
-            group.addEventListener("click", function (event) {
-              if (projectButtonHeld) {
-                stateReadout.textContent = index < 8
-                  ? "PROJECT SLOT " + (index + 1) + " REQUESTED · PROJECT CONTENT NOT LOADED"
-                  : "PROJECT SELECTION USES DRUM KEYS 1–8";
-                return;
-              }
-              if (deleteButtonHeld) {
-                stateReadout.textContent = "DELETE + DRUM KEY · TARGET DATA IS NOT LOADED IN THIS PREVIEW";
-                return;
-              }
-              if (allPatternMode) {
-                if (index < 6) setAllTrackPattern(index + 1, Number(event.detail) < 2);
-                return;
-              }
-              toggleDrumStep(index);
-            });
+            group.addEventListener("click", function (event) { handleDrumHardwarePad(index, event); });
             group.addEventListener("keydown", function (event) {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                if (projectButtonHeld) {
-                  stateReadout.textContent = index < 8
-                    ? "PROJECT SLOT " + (index + 1) + " REQUESTED · PROJECT CONTENT NOT LOADED"
-                    : "PROJECT SELECTION USES DRUM KEYS 1–8";
-                } else if (deleteButtonHeld) {
-                  stateReadout.textContent = "DELETE + DRUM KEY · TARGET DATA IS NOT LOADED IN THIS PREVIEW";
-                } else if (allPatternMode) {
-                  if (index < 6) setAllTrackPattern(index + 1, true);
-                } else {
-                  toggleDrumStep(index);
-                }
+                handleDrumHardwarePad(index, { detail: 1 });
               }
             });
             drumHardwareSteps.append(group);
@@ -1349,14 +1503,15 @@
           Array.from(drumHardwareSteps.children).forEach(function (pad, index) {
             const stepModeEnabled = channel <= 7 && trackType === "Drum" && Array.isArray(pattern);
             const patternModeEnabled = allPatternMode && index < 6;
-            const projectModeEnabled = projectButtonHeld && index < 8;
-            const enabled = projectButtonHeld ? projectModeEnabled : allPatternMode ? patternModeEnabled : stepModeEnabled;
+            const projectMode = projectButtonHeld || projectButtonLatched;
+            const projectModeEnabled = projectMode && index < 8;
+            const enabled = projectMode ? projectModeEnabled : allPatternMode ? patternModeEnabled : stepModeEnabled;
             pad.setAttribute("aria-disabled", String(!enabled));
-            pad.setAttribute("aria-pressed", String(Boolean(!projectButtonHeld && !allPatternMode && enabled && pattern[index])));
+            pad.setAttribute("aria-pressed", String(Boolean(!projectMode && !allPatternMode && enabled && pattern[index])));
             const isPlayhead = Boolean(stepModeEnabled && state.playing && playheadStep === index);
             pad.classList.toggle("playhead", isPlayhead);
             pad.setAttribute("aria-current", isPlayhead ? "step" : "false");
-            const label = projectButtonHeld
+            const label = projectMode
               ? (index < 8 ? "Request project slot " + (index + 1) : "Project selection uses Drum keys 1 to 8")
               : allPatternMode
                 ? (index < 6 ? "Set pattern " + (index + 1) + " for all tracks" : "Pattern selection uses Drum keys 1 to 6")
@@ -1444,9 +1599,11 @@
           drumSequences[channel][patterns[channel] || 1] = next;
           state.drumPattern = next.slice();
           state.drumPatternSource = "PREVIEW";
+          state.drumPatternKnown = null;
           state.drumPatternNumber = patterns[channel] || 1;
           state.view = "overview";
           state.until = 0;
+          focusPlaybackDetail("overview");
           syncDrumSteps();
           refreshPreviewReadout();
         }
@@ -1467,25 +1624,33 @@
           const displayName = deviceTrack.name + " / " + trackType.toUpperCase();
           const choices = presetChoices();
           const savedIndex = Math.max(0, Math.min((soundIndexes[channel] || 0), Math.max(0, choices.length - 1)));
+          const hasReceivedSoundValue = familyOverride === null && Object.prototype.hasOwnProperty.call(soundValuesByChannel, channel);
           const selectedSynthTrack = ((channel === 8 || channel === 9) && trackType === "Synth") || (channel === 10 && trackType === "DX");
           const recentNotes = previous.noteEvents || [];
           const heldSynthNote = recentNotes.slice().reverse().find(function (event) {
             return event.channel >= 8 && event.channel <= 10 && event.endedAt === null;
           });
+          const hasCapturedDrumEdits = trackType === "Drum" && channel <= 7
+            && Array.isArray(capturedDrumKnown[channel]) && capturedDrumKnown[channel].some(Boolean);
           state = Object.assign({}, Model.createInitialState(), {
             language: "en",
             theme: theme,
             source: familyOverride ? "demo" : "midi",
             deviceTrack: { name: displayName, channel: channel, family: familyId, type: trackType },
             track: family,
-            presets: choices,
-            preset: choices[savedIndex] || null,
-            selectedIndex: choices.length ? savedIndex : -1,
+            presets: hasReceivedSoundValue ? [] : choices,
+            preset: hasReceivedSoundValue ? null : choices[savedIndex] || null,
+            selectedIndex: hasReceivedSoundValue ? -1 : choices.length ? savedIndex : -1,
+            soundValue: hasReceivedSoundValue ? soundValuesByChannel[channel] : null,
             values: Object.assign({}, previous.values),
             bpm: previous.bpm,
             bpmSource: previous.bpmSource,
             bpmChange: previous.bpmChange,
             playing: previous.playing,
+            midiPlayback: previous.midiPlayback || Model.createMidiPlaybackState(),
+            playbackOverview: Boolean(previous.playbackOverview),
+            playbackFocus: Boolean(previous.playbackFocus),
+            previewPlayheadStep: previous.previewPlayheadStep,
             noteEvents: recentNotes,
             view: familyOverride ? "track" : "overview",
             until: 0,
@@ -1495,21 +1660,27 @@
             muteByChannel: previous.muteByChannel,
             soloTrack: previous.soloTrack,
             recording: recording,
-            drumPattern: trackType === "Drum" && channel <= 7 ? drumSequenceFor(channel).slice() : null,
-            drumPatternSource: trackType === "Drum" && channel <= 7 ? "PREVIEW" : null,
-            drumPatternNumber: patterns[channel] || 1,
+            drumPattern: trackType === "Drum" && channel <= 7
+              ? (hasCapturedDrumEdits ? capturedDrumSequenceFor(channel).slice() : drumSequenceFor(channel).slice()) : null,
+            drumPatternKnown: hasCapturedDrumEdits ? capturedDrumKnown[channel].slice() : null,
+            drumPatternSource: trackType === "Drum" && channel <= 7 ? (hasCapturedDrumEdits ? "MIDI EDIT" : "PREVIEW") : null,
+            drumPatternNumber: hasCapturedDrumEdits ? null : patterns[channel] || 1,
             activeNote: heldSynthNote ? heldSynthNote.note : selectedSynthTrack ? previous.activeNote : null
           });
           syncPreviewControls();
         }
 
-        function chooseChannel(value) {
+        function chooseChannel(value, notifyParent) {
           if (value !== channel) trackType = typeForChannel(value);
           channel = value;
           familyOverride = null;
           updateTrackTypeOptions();
           syncMidiChannelSelection();
           makeState();
+          if (notifyParent !== false && document.documentElement.dataset.embed === "hardware" && window.parent !== window) {
+            const targetOrigin = window.location.protocol === "file:" ? "*" : window.location.origin;
+            window.parent.postMessage({ type: "seqtrak-track-selected", channel: channel }, targetOrigin);
+          }
         }
 
         function stepPattern(target, direction, queued) {
@@ -1540,6 +1711,7 @@
             const visiblePattern = queuedPatterns[channel] || patterns[channel] || 1;
             stateReadout.textContent = "ALL TRACKS · PATTERN " + visiblePattern + (queued ? " QUEUED" : " SELECTED");
           }
+          focusPlaybackDetail("overview");
         }
 
         function presetChoices() {
@@ -1560,13 +1732,16 @@
           }
           const current = soundIndexes[channel] || 0;
           const next = (current + direction + choices.length) % choices.length;
+          delete soundValuesByChannel[channel];
           soundIndexes[channel] = next;
           state.presets = choices;
           state.selectedIndex = next;
           state.preset = choices[next];
+          state.soundValue = null;
           state.source = familyOverride ? "demo" : "midi";
           state.view = "sound";
           state.until = 0;
+          focusPlaybackDetail("sound");
           syncSoundControls();
           stateReadout.textContent = "CH " + String(channel).padStart(2, "0") + " · SOUND " + (next + 1) + "/" + choices.length + " · " + choices[next].name;
           if (recording) stateReadout.textContent += " · REC";
@@ -1785,12 +1960,13 @@
           const list = hardwareFxPresetList();
           const preset = list[hardwareFxPresetIndex] || null;
           const needleFraction = list.length > 1 ? hardwareFxPresetIndex / (list.length - 1) : 0;
-          document.getElementById("fxKnobIndicator").setAttribute("transform", "rotate(" + (-135 + needleFraction * 270) + " 1017 82)");
+          document.getElementById("fxKnobIndicator").setAttribute("transform", "rotate(" + (-135 + needleFraction * 270) + " 1027 82)");
           fxModeControl.setAttribute("aria-checked", String(fxUnitMode === "Master"));
-          document.getElementById("fxModeThumb").setAttribute("cx", fxUnitMode === "Master" ? "1001" : "1033");
+          document.getElementById("fxModeThumb").setAttribute("cx", fxUnitMode === "Master" ? "1001" : "1053");
           fxPageControl.setAttribute("aria-pressed", String(fxUnitPage === 2));
           fxPageControl.setAttribute("aria-label", "Simulator FX Page control. Current page " + fxUnitPage + ". Press to switch pages.");
           fxPageControl.textContent = "SIM PAGE " + fxUnitPage;
+          syncSideButtonState("page");
 
           const presetReadout = document.getElementById("fxUnitPresetReadout");
           if (state.fx.presetName) {
@@ -1803,7 +1979,7 @@
 
           const stripNames = ["fxLevel", "highPass", "repeater"];
           const assignedNames = stripNames.map(function (stripName) {
-            const mapping = FxUnit.stripMapping(fxUnitPage, stripName);
+            const mapping = currentFxStripMapping(stripName);
             if (mapping.kind === "performance") return mapping.parameter;
             const found = fxParameterForNumber(mapping.number);
             return found ? found.name : "PARAMETER " + mapping.number;
@@ -1812,7 +1988,7 @@
 
           fxStripControls.forEach(function (strip) {
             const key = strip.dataset.strip;
-            const mapping = FxUnit.stripMapping(fxUnitPage, key);
+            const mapping = currentFxStripMapping(key);
             let fraction = 0;
             let value = 0;
             let min = 0;
@@ -1874,6 +2050,11 @@
         }
 
         function rotateHardwareFx(direction) {
+          if (heldSoundTrackChannel !== null) {
+            if (channel !== heldSoundTrackChannel) chooseChannel(heldSoundTrackChannel);
+            rotateSound(direction);
+            return;
+          }
           const list = hardwareFxPresetList();
           if (!list.length) return;
           selectHardwareFxPreset(FxUnit.nextIndex(hardwareFxPresetIndex, direction, list.length));
@@ -1889,7 +2070,7 @@
 
         function toggleFxUnitPage() {
           fxUnitPage = fxUnitPage === 1 ? 2 : 1;
-          const mapping = FxUnit.stripMapping(fxUnitPage, "fxLevel");
+          const mapping = currentFxStripMapping("fxLevel");
           if (mapping && mapping.kind === "effectParameter" && state.fx.effect) syncFxParameterOptions(mapping.number);
           state.fx = Object.assign({}, state.fx, { performance: null });
           state.view = "effect";
@@ -1898,7 +2079,7 @@
         }
 
         function setHardwareStripValue(stripName, normalizedValue, active) {
-          const mapping = FxUnit.stripMapping(fxUnitPage, stripName);
+          const mapping = currentFxStripMapping(stripName);
           const normalized = Math.max(0, Math.min(127, Math.round(Number(normalizedValue))));
           if (!mapping) return false;
           if (mapping.kind === "performance") {
@@ -1951,7 +2132,7 @@
           function applyPointer(event, active) {
             const value = valueFromFxTouch(event);
             if (value === null) return;
-            if (FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance") performanceValue = value;
+            if (currentFxStripMapping(stripName).kind === "performance") performanceValue = value;
             setHardwareStripValue(stripName, value, active);
           }
           strip.addEventListener("pointerdown", function (event) {
@@ -1969,7 +2150,7 @@
             if (pointerId !== event.pointerId) return;
             pointerId = null;
             strip.classList.remove("active");
-            if (FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance") {
+            if (currentFxStripMapping(stripName).kind === "performance") {
               setHardwareStripValue(stripName, performanceValue, false);
             } else {
               syncFxUnitControls();
@@ -1981,7 +2162,7 @@
           strip.addEventListener("keydown", function (event) {
             const direction = event.key === "ArrowUp" || event.key === "ArrowRight" ? 1
               : event.key === "ArrowDown" || event.key === "ArrowLeft" ? -1 : 0;
-            const mapping = FxUnit.stripMapping(fxUnitPage, stripName);
+            const mapping = currentFxStripMapping(stripName);
             if (strip.getAttribute("aria-disabled") === "true") return;
             if (direction) {
               event.preventDefault();
@@ -1994,7 +2175,7 @@
               } else {
                 setHardwareStripValue(stripName, next, false);
               }
-            } else if ((event.key === "Enter" || event.key === " ") && FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance") {
+            } else if ((event.key === "Enter" || event.key === " ") && currentFxStripMapping(stripName).kind === "performance") {
               event.preventDefault();
               performanceValue = 127;
               strip.classList.add("active");
@@ -2003,13 +2184,13 @@
           });
           strip.addEventListener("keyup", function (event) {
             const keyHeld = ["Enter", " ", "ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft"].includes(event.key);
-            if (keyHeld && FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance" && strip.classList.contains("active")) {
+            if (keyHeld && currentFxStripMapping(stripName).kind === "performance" && strip.classList.contains("active")) {
               strip.classList.remove("active");
               setHardwareStripValue(stripName, performanceValue, false);
             }
           });
           strip.addEventListener("blur", function () {
-            if (strip.classList.contains("active") && FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance") {
+            if (strip.classList.contains("active") && currentFxStripMapping(stripName).kind === "performance") {
               strip.classList.remove("active");
               setHardwareStripValue(stripName, performanceValue, false);
             }
@@ -2175,6 +2356,148 @@
           return true;
         }
 
+        function applyReceivedStepChange(change) {
+          if (!change || change.channel < 1 || change.channel > 7 || change.step < 1 || change.step > 16) return false;
+          const sequence = capturedDrumSequenceFor(change.channel);
+          sequence[change.step - 1] = change.action === "on";
+          capturedDrumKnown[change.channel][change.step - 1] = true;
+          if (channel !== change.channel || trackType !== "Drum") chooseChannel(change.channel, false);
+          state.source = "midi";
+          state.drumPattern = sequence.slice();
+          state.drumPatternKnown = capturedDrumKnown[change.channel].slice();
+          state.drumPatternSource = "MIDI EDIT";
+          state.drumPatternNumber = null;
+          state.view = "overview";
+          state.until = 0;
+          focusPlaybackDetail("overview");
+          syncDrumSteps();
+          syncTrackSelection();
+          stateReadout.textContent = Model.MIDI_TRACKS[change.channel].name + " · STEP "
+            + String(change.step).padStart(2, "0") + " " + change.action.toUpperCase() + " · MIDI EDIT CAPTURE";
+          return true;
+        }
+
+        function applyReceivedMidi(received) {
+          const message = window.SeqtrakMidiConnection.classify(received.data);
+          if (message.type === "SYSTEM REALTIME") {
+            const status = Number(message.bytes && message.bytes[0]);
+            if (status === 0xf8 || status === 0xfa || status === 0xfc) {
+              state = Model.applyMidiRealtime(state, status, Number(received.timestamp) || performance.now());
+            }
+            return message;
+          }
+          if (message.channel >= 1 && message.channel <= 11
+            && ["NOTE ON", "NOTE OFF", "CONTROL CHANGE", "PROGRAM CHANGE", "OTHER"].includes(message.type)) {
+            chooseChannel(message.channel, false);
+          }
+          if (message.type === "NOTE ON" || message.type === "NOTE OFF") {
+            applyNoteEvent(message.type === "NOTE ON" ? "noteOn" : "noteOff", message.channel, message.note, message.velocity);
+          } else if (message.type === "CONTROL CHANGE") {
+            applyMidiControlChange(message.channel, message.controller, message.value);
+          } else if (message.type === "PROGRAM CHANGE") {
+            const deviceTrack = Model.MIDI_TRACKS[message.channel];
+            if (!deviceTrack) {
+              stateReadout.textContent = "CH " + String(message.channel).padStart(2, "0") + " · PROGRAM VALUE " + message.program + " · TRACK NOT MAPPED";
+              return message;
+            }
+            soundValuesByChannel[message.channel] = message.program;
+            state.source = "midi";
+            state.soundValue = message.program;
+            state.presets = [];
+            state.preset = null;
+            state.selectedIndex = -1;
+            state.view = "overview";
+            state.until = 0;
+            focusPlaybackDetail("overview");
+            syncSoundControls();
+            refreshPreviewReadout();
+          } else if (message.type === "SYSEX") {
+            const stepChange = Model.decodeStepChange(message.bytes);
+            if (!applyReceivedStepChange(stepChange)) stateReadout.textContent = "SYSEX RECEIVED · RAW BYTES LOGGED · NOT DECODED";
+          }
+          return message;
+        }
+
+        function appendMidiReceiveLog(received) {
+          const message = window.SeqtrakMidiConnection.classify(received.data);
+          if (message.type === "SYSEX") {
+            const stepChange = Model.decodeStepChange(message.bytes);
+            if (stepChange) {
+              message.decoded = {
+                type: "DRUM STEP EDIT",
+                track: Model.MIDI_TRACKS[stepChange.channel].name,
+                channel: stepChange.channel,
+                step: stepChange.step,
+                action: stepChange.action.toUpperCase()
+              };
+            }
+          }
+          if (message.type === "SYSTEM REALTIME") {
+            applyReceivedMidi(received);
+            if (Number(received.data && received.data[0]) === 0xfe) return;
+            if (Number(received.data && received.data[0]) === 0xf8) {
+              const now = Date.now();
+              if (now - lastRealtimeLogAt < 1000) { suppressedRealtimeCount += 1; return; }
+              message.coalescedCount = suppressedRealtimeCount;
+              suppressedRealtimeCount = 0;
+              lastRealtimeLogAt = now;
+            }
+          }
+          const log = document.getElementById("midiReceiveLog");
+          const rawHex = received.data.map(function (byte) { return byte.toString(16).toUpperCase().padStart(2, "0"); }).join(" ");
+          const record = Object.assign({ time: new Date().toLocaleTimeString(), input: received.portName, rawHex: rawHex }, message);
+          if (log.textContent === "No MIDI messages received.") log.textContent = "";
+          log.textContent += JSON.stringify(record) + "\n";
+          const rows = log.textContent.trimEnd().split("\n");
+          if (rows.length > 60) log.textContent = rows.slice(-60).join("\n") + "\n";
+          log.scrollTop = log.scrollHeight;
+          if (message.type !== "SYSTEM REALTIME") applyReceivedMidi(received);
+        }
+
+        if (!embeddedHardware) {
+          const midiReceiver = window.SeqtrakMidiConnection.createReceiver({
+            onStatus: function (result) {
+              const status = document.getElementById("midiConnectionStatus");
+              status.textContent = result.message;
+              status.dataset.state = result.status;
+              document.getElementById("midiConnect").disabled = result.status !== "disconnected";
+              document.getElementById("midiDisconnect").disabled = result.status === "disconnected";
+              document.getElementById("midiInputSelect").disabled = result.status === "disconnected";
+            },
+            onInputs: function (ports, selectedId) {
+              const select = document.getElementById("midiInputSelect");
+              const previous = selectedId || select.value;
+              select.replaceChildren(new Option("Choose MIDI input", ""));
+              ports.forEach(function (port) {
+                const label = [port.name, port.manufacturer].filter(Boolean).join(" · ");
+                select.add(new Option(label || port.name, port.id));
+              });
+              select.value = previous;
+              select.disabled = ports.length === 0;
+            },
+            onMessage: appendMidiReceiveLog
+          });
+          document.getElementById("midiConnect").addEventListener("click", async function () {
+            this.disabled = true;
+            try { await midiReceiver.connect(); }
+            catch (error) {
+              const status = document.getElementById("midiConnectionStatus");
+              status.textContent = error.message;
+              status.dataset.state = "error";
+              this.disabled = false;
+            }
+          });
+          document.getElementById("midiDisconnect").addEventListener("click", function () { midiReceiver.disconnect(); });
+          document.getElementById("midiInputSelect").addEventListener("change", async function () {
+            try { await midiReceiver.selectInput(this.value); }
+            catch (error) {
+              const status = document.getElementById("midiConnectionStatus");
+              status.textContent = error.message;
+              status.dataset.state = "error";
+            }
+          });
+        }
+
         const legacyDemoEvents = [
           ["30 43 00", "01 02"], ["30 44 00", "02 10"], ["30 45 00", "0C 70"],
           ["31 27 00", "08 10"], ["30 41 00", "01 02"]
@@ -2266,8 +2589,8 @@
                 clearPreviewMutes();
                 return;
               }
-              if (swingButtonHeld) {
-                stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+              if (swingButtonHeld || swingButtonLatched) {
+                reportSwingUnavailable();
                 return;
               }
               allPressStarted = true;
@@ -2275,14 +2598,15 @@
             } else {
               if (handleTrackKnobAction(target)) return;
               chooseChannel(target);
+              heldSoundTrackChannel = target;
             }
             drag = { pointerId: event.pointerId, lastY: event.clientY, remainder: 0, moved: false };
             knob.setPointerCapture(event.pointerId);
           });
           knob.addEventListener("pointermove", function (event) {
             if (!drag || drag.pointerId !== event.pointerId) return;
-            if (target === "all" && swingButtonHeld) {
-              stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+            if (target === "all" && (swingButtonHeld || swingButtonLatched)) {
+              reportSwingUnavailable();
               return;
             }
             drag.remainder += drag.lastY - event.clientY;
@@ -2293,6 +2617,7 @@
           function finishDrag() {
             suppressClick = Boolean(drag && drag.moved);
             drag = null;
+            if (heldSoundTrackChannel === target) heldSoundTrackChannel = null;
             if (allPressStarted) {
               allPressStarted = false;
               setAllPatternMode(false);
@@ -2302,8 +2627,8 @@
           knob.addEventListener("pointercancel", finishDrag);
           knob.addEventListener("wheel", function (event) {
             event.preventDefault();
-            if (target === "all" && swingButtonHeld) {
-              stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+            if (target === "all" && (swingButtonHeld || swingButtonLatched)) {
+              reportSwingUnavailable();
               return;
             }
             if (target !== "all") chooseChannel(target);
@@ -2317,7 +2642,7 @@
               event.preventDefault();
               if (target === "all") {
                 if (muteMode) clearPreviewMutes();
-                else if (swingButtonHeld) stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+                else if (swingButtonHeld || swingButtonLatched) reportSwingUnavailable();
                 else {
                   allPressStarted = true;
                   setAllPatternMode(true);
@@ -2325,8 +2650,8 @@
               } else if (!handleTrackKnobAction(target)) chooseChannel(target);
             } else if (event.key === "ArrowUp" || event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "ArrowLeft") {
               event.preventDefault();
-              if (target === "all" && swingButtonHeld) {
-                stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+              if (target === "all" && (swingButtonHeld || swingButtonLatched)) {
+                reportSwingUnavailable();
                 return;
               }
               if (target !== "all") chooseChannel(target);
@@ -2341,6 +2666,7 @@
             }
           });
           knob.addEventListener("blur", function () {
+            if (heldSoundTrackChannel === target) heldSoundTrackChannel = null;
             if (target === "all" && allPressStarted) {
               allPressStarted = false;
               setAllPatternMode(false);
@@ -2448,9 +2774,11 @@
 
         document.getElementById("preset").addEventListener("change", function (event) {
           const index = Number(event.target.value);
+          delete soundValuesByChannel[channel];
           soundIndexes[channel] = index;
           state = Model.selectPreset(state, index, performance.now());
           state.theme = theme;
+          focusPlaybackDetail("sound");
           syncSoundControls();
         });
 
@@ -2472,6 +2800,7 @@
           soundIndexes[channel] = index;
           state = Model.selectPreset(state, index, performance.now());
           state.theme = theme;
+          focusPlaybackDetail("sound");
           syncSoundControls();
         });
 
@@ -2601,8 +2930,26 @@
         makeState();
         syncFxOptions(null, null);
         selectHardwareFxPreset(0);
+        if (document.documentElement.dataset.embed === "hardware" && window.parent !== window) {
+          window.addEventListener("message", function (event) {
+            if (event.source !== window.parent || event.origin !== window.location.origin) return;
+            if (!event.data) return;
+            if (event.data.type === "seqtrak-midi-event" && Array.isArray(event.data.data)) {
+              applyReceivedMidi({ data: event.data.data, portName: event.data.portName || "Parent MIDI input" });
+              return;
+            }
+            if (event.data.type !== "seqtrak-select-channel") return;
+            const nextChannel = Number(event.data.channel);
+            if (Number.isInteger(nextChannel) && Model.MIDI_TRACKS[nextChannel]) chooseChannel(nextChannel);
+          });
+        }
 
         function draw(time) {
+          if (state.playbackOverview && !state.playing
+            && !Model.midiPlaybackActive(state.midiPlayback, Number(time))) {
+            state.playbackOverview = false;
+            if (state.midiPlayback) state.midiPlayback.active = false;
+          }
           if (state.view !== "overview" && state.until && Number(time) > Number(state.until)) {
             state = Object.assign({}, state, { view: "overview", until: 0 });
           }

@@ -111,6 +111,19 @@ body {
 
 .header-tools select { min-width: 116px; }
 .header-tools button { min-height: 35px; }
+.mode-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 35px;
+  border: 1px solid var(--border-strong);
+  color: var(--button-text);
+  padding: 0 10px;
+  font: 600 9px var(--font-data);
+  letter-spacing: .04em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.mode-link:hover { border-color: var(--accent); color: var(--accent); }
 
 .layout {
   display: grid;
@@ -319,7 +332,7 @@ pre {
 @media (max-width: 420px) {
   .page-header h1 { font-size: 18px; }
   .page-header h1 span { display: block; margin: 4px 0 0; }
-  .header-tools { align-self: stretch; justify-content: flex-end; }
+  .header-tools { align-self: stretch; justify-content: flex-end; flex-wrap: wrap; }
   .header-tools label { min-width: 100px; }
   .header-tools select { min-width: 0; }
 }

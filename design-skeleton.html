@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SEQTRAK Field Display — Structure Study</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="js/midi-connection.js" defer></script>
+  <script src="js/display-state.js" defer></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f0eee7;
+      --ink: #20221e;
+      --quiet: #77776f;
+      --device: #fffefa;
+      --device-mid: #e3e1d9;
+      --device-dark: #7d807c;
+      --screen: #101312;
+      --accent: #bd4c34;
+      --mono: "IBM Plex Mono", monospace;
+      --display: "Space Grotesk", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.45 var(--display); }
+    a { color: inherit; text-decoration: none; }
+    .page { width: min(1440px, 100%); margin: 0 auto; padding: 20px clamp(18px, 4vw, 64px) 96px; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 24px; }
+    .wordmark, .eyebrow, .meta, .nav, .spec, .section-index { font: 10px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .wordmark { font-weight: 600; letter-spacing: .03em; }
+    .nav { display: flex; gap: clamp(12px, 2.5vw, 34px); color: var(--quiet); }
+    .nav a:hover { color: var(--ink); }
+    .draft-tag { color: var(--accent); white-space: nowrap; }
+    .intro { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(250px, .65fr); align-items: end; gap: 40px; padding: 42px 0 35px; }
+    .eyebrow { margin: 0 0 12px; color: var(--quiet); }
+    h1 { max-width: 950px; margin: 0; font: 600 clamp(48px, 5.2vw, 72px)/.96 "Barlow Condensed", sans-serif; letter-spacing: -.035em; }
+    .intro-copy { max-width: 400px; margin: 0 0 4px; color: #55574f; font-size: clamp(15px, 1.4vw, 19px); }
+    .scene { display: grid; grid-template-columns: minmax(240px, .68fr) minmax(0, 1.75fr); align-items: center; gap: clamp(24px, 5vw, 72px); padding: 34px 0 52px; }
+    .unit-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 12px; }
+    .unit-head h2 { margin: 0; font: 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .spec { color: var(--quiet); font-size: 9px; }
+    .screen-shell { padding: 10px; background: #d9d7cf; }
+    .screen { position: relative; aspect-ratio: 320 / 170; overflow: hidden; background: var(--screen); color: #f3f3ee; font-family: var(--mono); }
+    .screen-top { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; color: #aeb4b0; font-size: 9px; }
+    .screen-top span:last-child { text-align: right; }
+    .screen-track { display: flex; align-items: center; gap: 8px; padding: 3px 10px 0; color: #d7dfd9; font-size: clamp(18px, 2.2vw, 30px); }
+    .screen-track b { color: #e27655; font-weight: 500; }
+    .screen-wave { display: flex; align-items: center; gap: 3px; height: 46px; padding: 4px 11px; }
+    .screen-wave i { display: block; width: 3px; height: var(--h); background: #c9d0cb; opacity: .8; }
+    .screen-pitch { display: none; height: 46px; align-items: center; padding: 4px 11px; color: #e27655; font-size: 13px; }
+    .screen[data-mode="synth"] .screen-wave, .screen[data-mode="synth"] .screen-steps { display: none; }
+    .screen[data-mode="synth"] .screen-pitch { display: flex; }
+    .screen-steps { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; margin: 4px 10px; }
+    .screen-steps i { height: 9px; background: #343a36; }
+    .screen-steps i.is-active { background: #e27655; }
+    .screen-name { position: absolute; right: 10px; bottom: 8px; left: 10px; display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid #4a504b; padding-top: 6px; color: #d9ded9; font-size: 8px; }
+    .screen-name span:first-child { min-width: 0; overflow-wrap: anywhere; }
+    .screen-name span:last-child { flex: 0 0 auto; }
+    .screen[data-mode="sampler"] .screen-steps { display: none; }
+    .device { display: block; width: 100%; height: auto; }
+    .device .track-target { cursor: pointer; transition: fill .15s ease; }
+    .device .track-target:hover, .device .track-target:focus, .device .track-target[aria-pressed="true"] { fill: var(--accent); stroke: #20221e; stroke-width: 2; }
+    .scene-note { display: flex; justify-content: space-between; gap: 18px; margin-top: 10px; color: var(--quiet); font: 9px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+    .chapters { display: grid; gap: clamp(58px, 10vw, 140px); padding-top: 28px; }
+    .chapter { display: grid; grid-template-columns: minmax(180px, .6fr) minmax(0, 1.4fr); align-items: start; gap: clamp(24px, 5vw, 72px); }
+    .chapter-title { position: sticky; top: 24px; }
+    .section-index { margin: 0 0 10px; color: var(--accent); }
+    .chapter h2 { margin: 0; font: 600 clamp(42px, 6vw, 72px)/.94 "Barlow Condensed", sans-serif; letter-spacing: -.035em; }
+    .chapter-copy { max-width: 580px; margin: 8px 0 24px; color: #55574f; font-size: 17px; }
+    .study-board { min-height: 210px; padding: clamp(18px, 3vw, 36px); background: #e4e1d8; }
+    .study-board.dark { background: #20231f; color: #f1f0e8; }
+    .study-label { margin: 0 0 18px; color: var(--quiet); font: 9px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .dark .study-label { color: #a5a79e; }
+    .track-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .track-row button { min-height: 74px; display: grid; place-items: center; border: 0; padding: 8px 4px; background: #f5f3ec; color: var(--ink); font: 9px var(--mono); cursor: pointer; }
+    .track-row button:hover, .track-row button:focus-visible { outline: 1px solid var(--ink); outline-offset: -1px; }
+    .track-row button[aria-pressed="true"] { background: var(--ink); color: #f5f3ec; }
+    .track-row button[aria-pressed="true"] small { color: #c5c7bf; }
+    .track-display { margin-top: 18px; padding: clamp(16px, 2.2vw, 28px); background: #20231f; color: #f1f0e8; color-scheme: dark; }
+    .track-display .micro-copy { color: #a5a79e; }
+    .track-display-head { display: flex; justify-content: space-between; align-items: start; gap: 16px; margin-bottom: 18px; }
+    .track-display-head h3 { margin: 7px 0 0; font: 500 clamp(26px, 4vw, 48px)/1 var(--mono); letter-spacing: -.045em; }
+    .demo-stamp { flex: 0 0 auto; padding: 8px 12px; color: #e27655; border: 1px solid #e27655; font: 11px var(--mono); letter-spacing: .06em; }
+    .track-display-screen { padding: clamp(14px, 1.8vw, 24px); background: #101312; color: #f1f0e8; font-family: var(--mono); }
+    .track-screen-meta { display: flex; justify-content: space-between; gap: 10px; color: #aeb4b0; font-size: clamp(10px, 1vw, 14px); text-transform: uppercase; }
+    .track-screen-main { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin: clamp(20px, 2.4vw, 32px) 0; }
+    .track-screen-main strong { color: #f3f3ee; font-size: clamp(24px, 3.2vw, 40px); line-height: 1; font-weight: 500; }
+    .track-screen-main span { color: #e27655; font-size: clamp(11px, 1.2vw, 16px); text-align: right; }
+    .track-visual { min-height: 48px; display: flex; align-items: center; }
+    .track-visual[data-mode="synth"] .drum-steps, .track-visual[data-mode="synth"] .sampler-wave,
+    .track-visual[data-mode="drum"] .synth-keys, .track-visual[data-mode="drum"] .sampler-wave,
+    .track-visual[data-mode="sampler"] .drum-steps, .track-visual[data-mode="sampler"] .synth-keys { display: none; }
+    .drum-steps { display: grid; width: 100%; grid-template-columns: repeat(16, minmax(0,1fr)); gap: clamp(3px, .45vw, 6px); }
+    .drum-steps i { height: clamp(28px, 3.5vw, 48px); background: #343a36; }
+    .drum-steps i.is-active { background: #e27655; }
+    .synth-keys { display: flex; gap: 3px; }
+    .synth-keys span { min-width: 38px; padding: 12px 8px; background: #f1f0e8; color: #20221e; text-align: center; font-size: 11px; }
+    .sampler-wave { width: 100%; height: 48px; display: flex; align-items: center; justify-content: space-around; gap: 2px; }
+    .sampler-wave i { width: 2px; height: var(--h); background: #c9d0cb; }
+    .track-screen-footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #4a504b; color: #aeb4b0; font-size: clamp(10px, 1vw, 14px); text-transform: uppercase; }
+    .step-row { display: grid; grid-template-columns: repeat(16, 1fr); gap: 5px; margin-top: 22px; }
+    .step-row i { height: 34px; background: #c4c1b8; }
+    .step-row i:nth-child(4n + 1), .step-row i:nth-child(4n + 3) { background: var(--accent); }
+    .fx-layout { display: grid; grid-template-columns: minmax(120px, 1.2fr) repeat(2, minmax(100px, 1fr)); gap: 8px; }
+    .fx-unit { min-height: 130px; padding: 12px; background: #f8f6ef; }
+    .fx-unit.wide { min-width: 0; }
+    .fx-dial { width: 44px; height: 44px; margin: 12px auto 18px; border: 2px solid #6b706d; border-radius: 50%; background: linear-gradient(135deg, #fff, #d6d7d2); }
+    .toggle { width: 78%; height: 12px; margin: 0 auto; border-radius: 10px; background: #a5aaa6; position: relative; }
+    .toggle::after { content: ""; position: absolute; top: 1px; right: 2px; width: 10px; height: 10px; border-radius: 50%; background: white; }
+    .strip-lines { display: grid; gap: 8px; margin: 18px 4px 0; }
+    .strip-lines i { height: 2px; background: #989d99; }
+    .performance { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .performance div { min-height: 120px; display: flex; align-items: end; justify-content: space-between; padding: 14px; background: #f8f6ef; font: 10px var(--mono); }
+    .rec-dot { width: 9px; height: 9px; background: var(--accent); border-radius: 50%; }
+    .track-row span { min-height: 82px; align-content: center; gap: 8px; text-align: center; }
+    .track-row strong { font: 600 11px var(--mono); }
+    .track-row small, .micro-copy { color: var(--quiet); font: 9px/1.5 var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+    .track-row small { display: block; }
+    .data-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin-top: 20px; background: #c9c7be; }
+    .data-cell { min-height: 92px; padding: 14px; background: #f8f6ef; }
+    .data-cell b { display: block; margin: 12px 0 4px; font-size: 13px; font-weight: 500; }
+    .data-cell p { margin: 0; color: #66675f; font-size: 11px; }
+    .data-cell ul { margin: 9px 0 0; padding: 0; list-style: none; color: #66675f; font-size: 10px; line-height: 1.7; }
+    .data-cell li::before { content: "· "; color: var(--accent); }
+    .unknown { color: #8b8c84; font-family: var(--mono); }
+    .legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; color: #55574f; font: 9px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+    .legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .legend i { width: 8px; height: 8px; display: inline-block; background: var(--accent); }
+    .legend i.outline { background: transparent; border: 1px solid #77776f; }
+    .sequence-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-bottom: 20px; background: #474b47; }
+    .sequence-meta div { padding: 12px; background: #20231f; }
+    .sequence-meta b { display: block; margin-top: 8px; font: 500 17px var(--mono); }
+    .sequence-meta .micro-copy { color: #a5a79e; }
+    .step-row i { position: relative; }
+    .step-row i:nth-child(4n + 1)::after, .step-row i:nth-child(4n + 3)::after { content: ""; position: absolute; inset: 0; background: var(--accent); }
+    .sequence-note { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 20px; color: #c5c7bf; font-size: 12px; }
+    .sequence-note p { margin: 0; }
+    .sequence-note b { display: block; margin-bottom: 5px; color: #f1f0e8; font: 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .signal-flow { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); align-items: stretch; gap: 18px; margin: 0 0 26px; }
+    .master-flow { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); align-items: stretch; gap: 18px; margin: 0 0 26px; }
+    .flow-node { position: relative; min-height: 78px; display: flex; flex-direction: column; justify-content: space-between; padding: 12px; background: #f8f6ef; }
+    .flow-node:not(:last-child)::after { content: "→"; position: absolute; top: 50%; right: -15px; transform: translate(50%, -50%); color: #76776f; font: 14px var(--mono); }
+    .flow-node strong { font: 10px var(--mono); }
+    .flow-node small { color: var(--quiet); font: 8px/1.35 var(--mono); text-transform: uppercase; }
+    .send-lane { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -12px 0 26px 20%; }
+    .send-lane div { padding: 10px 12px; background: #dedbd2; font: 9px var(--mono); }
+    .send-lane small { display: block; margin-top: 5px; color: #66675f; }
+    .fx-layout { margin-bottom: 22px; }
+    .fx-layout .unit-head { align-items: flex-start; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 10px; }
+    .fx-layout .unit-head h2 { min-width: 0; font-size: 8px; line-height: 1.2; letter-spacing: .05em; overflow-wrap: anywhere; }
+    .fx-layout .unit-head .spec { min-width: 0; font-size: 7px; line-height: 1.25; white-space: normal; overflow-wrap: anywhere; }
+    .fx-layout .fx-unit { min-width: 0; padding: 10px; }
+    .fx-unit .micro-copy { display: block; text-align: center; font-size: 7px; line-height: 1.3; letter-spacing: .02em; overflow-wrap: anywhere; }
+    .fx-categories { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 22px; background: #c9c7be; }
+    .fx-categories span { padding: 10px; background: #f8f6ef; font: 9px var(--mono); }
+    .fx-categories b { display: block; margin-bottom: 5px; font-weight: 600; }
+    .preset-index { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin-top: 1px; background: #c9c7be; }
+    .preset-card { min-width: 0; padding: 13px; background: #f8f6ef; }
+    .preset-card h3 { margin: 0 0 8px; font: 600 10px var(--mono); letter-spacing: .06em; }
+    .preset-card ol { display: grid; grid-template-columns: 22px 1fr; gap: 4px 6px; margin: 0; padding: 0; list-style: none; color: #55574f; font: 9px/1.45 var(--mono); }
+    .preset-card li:nth-child(odd) { grid-column: 1; color: var(--quiet); }
+    .preset-card li:nth-child(even) { grid-column: 2; }
+    .preset-scope { margin: 0 0 8px; color: var(--quiet); font: 8px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+    .parameter-reference { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1px; margin-top: 1px; background: #c9c7be; }
+    .parameter-reference div { padding: 12px; background: #f8f6ef; }
+    .parameter-reference b { display: block; margin-bottom: 6px; font: 9px var(--mono); }
+    .parameter-reference p { margin: 0; color: #66675f; font-size: 10px; }
+    .assignment-table { width: 100%; margin-top: 22px; border-collapse: collapse; font-size: 11px; }
+    .assignment-table th, .assignment-table td { padding: 10px 8px; border-bottom: 1px solid #c9c7be; text-align: left; vertical-align: top; }
+    .assignment-table th { color: var(--quiet); font: 9px var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+    .assignment-table td:first-child { width: 20%; font: 10px var(--mono); }
+    .performance { margin-bottom: 22px; }
+    .performance div { min-height: 96px; align-items: flex-start; flex-direction: column; }
+    .performance b { margin-top: auto; font: 500 22px var(--mono); }
+    .performance .rec-dot { width: 10px; height: 10px; }
+    .state-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: #c9c7be; }
+    .state-list div { padding: 12px; background: #f8f6ef; }
+    .state-list b { display: block; margin: 7px 0 4px; font: 11px var(--mono); }
+    .state-list p { margin: 0; color: #66675f; font-size: 11px; }
+    .caution { margin: 16px 0 0; padding-left: 12px; border-left: 2px solid var(--accent); color: #55574f; font-size: 12px; }
+    .track-display .caution { margin: 26px 0 0; padding-left: 24px; border-left-width: 3px; color: #b0b1a7; font-size: clamp(13px, 1.4vw, 18px); line-height: 1.55; }
+    .simulator-stage { padding: 8px 0 26px; }
+    .simulator-frame-caption { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 8px; color: var(--quiet); font: 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .midi-connection-panel { display: grid; grid-template-columns: auto minmax(180px, .6fr) minmax(220px, 1fr); align-items: end; gap: 10px 14px; margin: 0 0 12px; padding: 14px 16px; background: #20231f; color: #f1f0e8; }
+    .midi-connection-panel label { display: block; margin-bottom: 5px; color: #a5a79e; font: 8px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .midi-connection-panel select { width: 100%; min-height: 34px; border: 1px solid #555950; border-radius: 0; padding: 5px 8px; background: #151714; color: #f1f0e8; font: 10px var(--mono); }
+    .midi-connection-actions { display: flex; gap: 6px; }
+    .midi-connection-panel button { min-height: 34px; border: 1px solid #88897f; border-radius: 0; padding: 6px 10px; background: transparent; color: #f1f0e8; font: 9px var(--mono); cursor: pointer; }
+    .midi-connection-panel button:hover:not(:disabled) { border-color: #e27655; color: #e27655; }
+    .midi-connection-panel button:disabled { cursor: not-allowed; opacity: .45; }
+    .midi-connection-status { min-height: 1.4em; grid-column: 1 / -1; color: #b0b1a7; font: 9px/1.5 var(--mono); }
+    .midi-connection-status[data-state="listening"] { color: #e27655; }
+    .midi-log { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+    .midi-log summary { color: #a5a79e; cursor: pointer; font: 8px var(--mono); letter-spacing: .08em; }
+    .midi-log-copy, .midi-log-clear { min-height: 28px !important; padding: 4px 8px !important; font-size: 8px !important; }
+    .midi-log pre { grid-column: 1 / -1; max-height: 160px; margin: 8px 0 0; overflow: auto; color: #d2d3ca; font: 9px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .simulator-frame { display: block; width: 100%; height: 500px; border: 0; background: transparent; }
+    .simulator-note { margin: 8px 0 0; color: var(--quiet); font: 9px/1.5 var(--mono); text-transform: uppercase; }
+    .note-classes { display: flex; flex-wrap: wrap; gap: 5px; margin: 14px 0 22px; }
+    .note-classes span { min-width: 34px; padding: 6px; background: #e4e1d8; text-align: center; font: 10px var(--mono); }
+    .mute-flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 20px; background: #c9c7be; }
+    .mute-flow div { padding: 12px; background: #f8f6ef; }
+    .mute-flow b { display: block; margin: 7px 0 4px; font: 10px var(--mono); }
+    .mute-flow p { margin: 0; color: #66675f; font-size: 11px; }
+    footer { display: flex; justify-content: space-between; gap: 24px; margin-top: 96px; padding-top: 18px; color: var(--quiet); font: 9px var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+    @media (max-width: 760px) {
+      .page { padding-top: 14px; }
+      .topline { align-items: flex-start; flex-wrap: wrap; }
+      .nav { order: 3; width: 100%; overflow: auto; padding-top: 8px; }
+      .intro, .scene, .chapter { grid-template-columns: 1fr; }
+      .intro { gap: 22px; padding-top: 30px; }
+      .scene { gap: 34px; }
+      .display-unit { max-width: 520px; }
+      .chapter-title { position: static; }
+      .track-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .track-row button { min-height: 52px; }
+      .track-display { padding: 16px; }
+      .track-display-head { gap: 10px; margin-bottom: 14px; }
+      .track-display-head h3 { font-size: clamp(24px, 7vw, 36px); }
+      .demo-stamp { padding: 6px 8px; font-size: 9px; }
+      .track-display-screen { padding: 12px; }
+      .track-screen-main { margin: 20px 0; }
+      .track-screen-main strong { font-size: clamp(22px, 6vw, 30px); }
+      .track-display .caution { margin-top: 18px; padding-left: 12px; font-size: 12px; }
+      .step-row { gap: 3px; }
+      .step-row i { height: 23px; }
+      .fx-layout { grid-template-columns: minmax(92px, 1fr) repeat(2, minmax(80px, 1fr)); gap: 5px; }
+      .fx-unit { min-height: 116px; padding: 9px; }
+      .fx-layout .fx-unit { padding: 8px; }
+      .data-grid, .state-list { grid-template-columns: 1fr; }
+      .mute-flow { grid-template-columns: repeat(2, 1fr); }
+      .sequence-note { grid-template-columns: 1fr; }
+      .signal-flow, .master-flow { grid-template-columns: 1fr; gap: 6px; }
+      .flow-node { min-height: 56px; }
+      .flow-node:not(:last-child)::after { content: "↓"; top: auto; right: 50%; bottom: -12px; transform: translate(50%, 50%); z-index: 1; }
+      .send-lane { margin-left: 0; }
+      .fx-categories { grid-template-columns: repeat(2, 1fr); }
+      .preset-index { grid-template-columns: 1fr; }
+      .parameter-reference { grid-template-columns: 1fr; }
+      .assignment-table { font-size: 10px; }
+      .assignment-table th, .assignment-table td { padding: 8px 4px; }
+      .assignment-table td:first-child { width: auto; }
+      .simulator-frame { height: 640px; }
+      .midi-connection-panel { grid-template-columns: 1fr; align-items: start; gap: 8px; }
+      .midi-connection-status, .midi-log { grid-column: 1; }
+      footer { flex-direction: column; margin-top: 64px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topline">
+      <div class="wordmark">SEQTRAK FIELD DISPLAY</div>
+      <nav class="nav" aria-label="Study sections">
+        <a href="#sound">Sound</a><a href="#sequence">Sequence</a><a href="#fx">FX</a><a href="#performance">Performance</a>
+      </nav>
+      <div class="meta draft-tag">Structure study · demo</div>
+    </header>
+
+    <section class="intro" aria-labelledby="title">
+      <div>
+        <p class="eyebrow">An independent visual companion</p>
+        <h1 id="title">Keep your hands<br>on the instrument.</h1>
+      </div>
+      <p class="intro-copy">A compact visual companion for sound design, sequencing, and live performance. The instrument stays at the center; essential state comes into view around it.</p>
+    </section>
+
+    <section class="simulator-stage" aria-label="Interactive SEQTRAK and external display simulator">
+      <div class="simulator-frame-caption"><span>External display + hardware</span><span>Live simulator · 320 × 170</span></div>
+      <section class="midi-connection-panel" aria-label="USB MIDI input connection">
+        <div class="midi-connection-actions"><button id="midiConnect" type="button">CONNECT MIDI</button><button id="midiDisconnect" type="button" disabled>DISCONNECT</button></div>
+        <div><label for="midiInputSelect">MIDI INPUT PORT</label><select id="midiInputSelect" disabled><option value="">Connect MIDI to list input ports</option></select></div>
+        <span id="midiConnectionStatus" class="midi-connection-status" role="status">Not connected. Use Chrome on HTTPS or localhost.</span>
+        <details class="midi-log"><summary>RECEIVED MESSAGE LOG</summary><button id="midiLogCopy" class="midi-log-copy" type="button" data-copy-target="midiReceiveLog" aria-label="Copy received MIDI log">COPY LOG</button><button id="midiLogClear" class="midi-log-clear" type="button" data-clear-target="midiReceiveLog" aria-label="Clear received MIDI log">CLEAR LOG</button><pre id="midiReceiveLog" aria-live="polite">No MIDI messages received.</pre></details>
+      </section>
+      <iframe id="simulatorFrame" class="simulator-frame" src="index.html?embed=hardware#hardware-view" title="Interactive SEQTRAK hardware and external display preview"></iframe>
+      <p class="simulator-note">The hardware controls are local simulations. When connected, the page receives MIDI input only and does not send commands to SEQTRAK.</p>
+    </section>
+
+    <div class="chapters">
+      <section class="chapter" id="sound">
+        <div class="chapter-title"><p class="section-index">01 / Sound</p><h2>Choose<br>the voice.</h2></div>
+        <div>
+          <p class="chapter-copy">Select a track to see how its display could change. The preview prioritizes the track and sound name, then adapts its graphic to the instrument family.</p>
+          <div class="study-board">
+            <p class="study-label">Select a track · display layout changes below</p>
+            <div class="track-row" role="group" aria-label="Select a track preview">
+              <button class="track-select" type="button" data-track="KICK" data-family="drum" aria-pressed="true"><strong>KICK</strong><small>DRUM</small></button><button class="track-select" type="button" data-track="SNARE" data-family="drum" aria-pressed="false"><strong>SNARE</strong><small>DRUM</small></button><button class="track-select" type="button" data-track="CLAP" data-family="drum" aria-pressed="false"><strong>CLAP</strong><small>DRUM</small></button><button class="track-select" type="button" data-track="HAT 1" data-family="drum" aria-pressed="false"><strong>HAT 1</strong><small>DRUM</small></button><button class="track-select" type="button" data-track="HAT 2" data-family="drum" aria-pressed="false"><strong>HAT 2</strong><small>DRUM</small></button>
+              <button class="track-select" type="button" data-track="PERC 1" data-family="drum" aria-pressed="false"><strong>PERC 1</strong><small>DRUM</small></button><button class="track-select" type="button" data-track="PERC 2" data-family="drum" aria-pressed="false"><strong>PERC 2</strong><small>DRUM</small></button><button class="track-select" type="button" data-track="SYNTH 1" data-family="synth" aria-pressed="false"><strong>SYNTH 1</strong><small>SYNTH</small></button><button class="track-select" type="button" data-track="SYNTH 2" data-family="synth" aria-pressed="false"><strong>SYNTH 2</strong><small>SYNTH</small></button><button class="track-select" type="button" data-track="DX" data-family="synth" aria-pressed="false"><strong>DX</strong><small>FM SYNTH</small></button><button class="track-select" type="button" data-track="SAMPLER" data-family="sampler" aria-pressed="false"><strong>SAMPLER</strong><small>SAMPLE</small></button>
+            </div>
+            <div class="track-display" aria-live="polite">
+              <div class="track-display-head"><div><span class="micro-copy">External display · selected track</span><h3 id="trackTitle">KICK / DRUM</h3></div><span id="displaySourceStamp" class="demo-stamp">SIMULATED</span></div>
+              <div class="track-display-screen">
+                <div class="track-screen-meta"><span id="screenFamily">DRUM / KICK</span><span id="screenConnectionState">NO MIDI DATA</span></div>
+                <div class="track-screen-main"><strong id="screenPrimary">SOUND NAME</strong><span id="screenSecondary">NOT RECEIVED</span></div>
+                <div class="track-visual" id="trackVisual" data-mode="drum">
+                  <div class="drum-steps" id="drumPatternSteps" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="synth-keys" aria-hidden="true"><span>C</span><span>D</span><span>E</span><span>G</span><span>A</span></div>
+                  <div class="sampler-wave" aria-hidden="true"><i style="--h:8px"></i><i style="--h:18px"></i><i style="--h:12px"></i><i style="--h:30px"></i><i style="--h:20px"></i><i style="--h:10px"></i><i style="--h:26px"></i><i style="--h:15px"></i><i style="--h:32px"></i><i style="--h:13px"></i><i style="--h:22px"></i><i style="--h:9px"></i><i style="--h:28px"></i><i style="--h:16px"></i><i style="--h:24px"></i><i style="--h:11px"></i></div>
+                </div>
+                <div class="track-screen-footer"><span id="screenDetail">16-STEP PATTERN · EXAMPLE</span><span id="screenParameter">DECAY —</span></div>
+              </div>
+              <p class="caution">MIDI input can update the selected channel and received Note or documented CC values. The step pattern and waveform remain illustrative; Program Change does not identify a preset name, and unknown SysEx is logged without interpretation.</p>
+            </div>
+            <div class="data-grid">
+              <div class="data-cell"><span class="micro-copy">01 / Selection</span><b>Sound identity</b><ul><li>Selected track</li><li>Preset name</li><li>Engine or sound family</li></ul></div>
+              <div class="data-cell"><span class="micro-copy">02 / Shared sound controls</span><b>Shape the voice</b><ul><li>Pitch, pan, volume</li><li>AEG attack, decay / release</li><li>LP–HP cutoff and resonance</li><li>Reverb / delay send, EQ gain</li></ul></div>
+              <div class="data-cell"><span class="micro-copy">03 / Synth & DX</span><b>Play behavior</b><ul><li>Mono / poly / chord and portamento time</li><li>Arpeggiator type, gate time, speed</li><li>FM algorithm; modulator amount, frequency, feedback</li><li>PEG attack / decay levels and times</li></ul></div>
+              <div class="data-cell"><span class="micro-copy">04 / Sampler</span><b>Sample shape</b><ul><li>Start and end points</li><li>Loop on / off and loop length</li></ul></div>
+            </div>
+            <p class="caution">The values above describe supported display topics. A preset name or parameter value appears only when received; unavailable data stays unknown.</p>
+          </div>
+        </div>
+      </section>
+      <section class="chapter" id="sequence">
+        <div class="chapter-title"><p class="section-index">02 / Sequence</p><h2>See the<br>pattern.</h2></div>
+        <div>
+          <p class="chapter-copy">For a selected drum part, a compact 16-step overview can show the pattern and current play position together. Stored steps and a moving playhead are separate signals, so the display can distinguish the arrangement from playback.</p>
+          <div class="study-board dark">
+            <p class="study-label">Pattern view · illustrative layout only</p>
+            <div class="sequence-meta"><div><span class="micro-copy">Track</span><b>KICK</b></div><div><span class="micro-copy">Pattern data</span><b>DEMO</b></div><div><span class="micro-copy">Playhead</span><b>—</b></div></div>
+            <div class="step-row" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="legend"><span><i></i>Example active step</span><span><i class="outline"></i>Inactive step</span><span>Outline / play position</span></div>
+            <div class="sequence-note"><p><b>What it can communicate</b>Selected drum track, active steps, and playback position when each is available.</p><p><b>Current boundary</b>This page's pattern is a visual example. Hardware pattern reading and step data are not connected.</p></div>
+          </div>
+        </div>
+      </section>
+      <section class="chapter" id="fx">
+        <div class="chapter-title"><p class="section-index">03 / Effects</p><h2>Shape<br>the space.</h2></div>
+        <div>
+          <p class="chapter-copy">The FX view identifies the target, effect name, and the parameter currently assigned to each touch strip. Track effects, shared send effects, and master processing are shown as separate stages.</p>
+          <div class="study-board">
+            <p class="study-label">Signal path · documented effect structure</p>
+            <div class="signal-flow"><div class="flow-node"><strong>SINGLE EFFECT</strong><small>Selected track</small></div><div class="flow-node"><strong>LP / HP FILTER</strong><small>Track filter</small></div><div class="flow-node"><strong>2-BAND EQ</strong><small>Track EQ</small></div></div>
+            <div class="send-lane"><div>DELAY SEND<small>Parallel send · per-track send / shared return</small></div><div>REVERB SEND<small>Parallel send · per-track send / shared return</small></div></div>
+            <p class="study-label">Master path · output processing order</p>
+            <div class="master-flow"><div class="flow-node"><strong>MASTER EFFECT</strong><small>Shared output</small></div><div class="flow-node"><strong>HIGH PASS</strong><small>Performance filter</small></div><div class="flow-node"><strong>REPEATER</strong><small>Performance repeat</small></div><div class="flow-node"><strong>COMPRESSOR</strong><small>Dynamics</small></div><div class="flow-node"><strong>5-BAND EQ</strong><small>Final stage</small></div></div>
+            <p class="study-label">FX module · selector and touch strips</p>
+            <div class="fx-layout"><div class="fx-unit"><div class="unit-head"><h2>FX / SELECT</h2><span class="spec">TYPE</span></div><div class="fx-dial"></div><div class="toggle"></div><span class="micro-copy">MASTER / SINGLE</span><div class="strip-lines"><i></i><i></i><i></i><i></i><i></i></div><span class="micro-copy">FX LEVEL · TOUCH STRIP</span></div><div class="fx-unit wide"><div class="unit-head"><h2>HIGH PASS</h2><span class="spec">TOUCH STRIP</span></div><div class="strip-lines"><i></i><i></i><i></i><i></i><i></i></div><span class="micro-copy">Page 1 · cutoff</span></div><div class="fx-unit wide"><div class="unit-head"><h2>REPEATER</h2><span class="spec">TOUCH STRIP</span></div><div class="strip-lines"><i></i><i></i><i></i><i></i><i></i></div><span class="micro-copy">Page 1 · beat repeat length</span></div></div>
+            <div class="fx-categories"><span><b>FILTER</b>LPF / HPF</span><span><b>REVERB</b>Room / hall</span><span><b>DELAY</b>Tempo / analog</span><span><b>COMPRESSOR</b>8 settings</span><span><b>DISTORTION</b>Drive / crush</span><span><b>MODULATION</b>Chorus / phaser</span><span><b>DUCKER</b>8 settings</span><span><b>OTHER</b>Repeat / slice</span></div>
+            <p class="study-label">Preset reference · track and master effect families</p>
+            <div class="preset-index">
+              <article class="preset-card"><h3>FILTER · CONTROL FILTER</h3><ol><li>01</li><li>LPF — NO RESONANCE</li><li>02</li><li>LPF — LOW RESONANCE</li><li>03</li><li>LPF — MID RESONANCE</li><li>04</li><li>LPF — HIGH RESONANCE</li><li>05</li><li>HPF — NO RESONANCE</li><li>06</li><li>HPF — LOW RESONANCE</li><li>07</li><li>HPF — MID RESONANCE</li><li>08</li><li>HPF — HIGH RESONANCE</li></ol></article>
+              <article class="preset-card"><h3>REVERB</h3><ol><li>01</li><li>SMALL ROOM 1</li><li>02</li><li>SMALL ROOM 2</li><li>03</li><li>MID ROOM</li><li>04</li><li>SMALL HALL</li><li>05</li><li>MID HALL</li><li>06</li><li>STAGE</li><li>07</li><li>GATED REVERB</li><li>08</li><li>REVERSE REVERB</li></ol></article>
+              <article class="preset-card"><h3>DELAY</h3><ol><li>01</li><li>TEMPO DELAY 4TH</li><li>02</li><li>PING PONG DELAY 4TH</li><li>03</li><li>TEMPO DELAY 8TH DOT</li><li>04</li><li>TEMPO DELAY 8TH</li><li>05</li><li>PING PONG DELAY 8TH</li><li>06</li><li>TEMPO DELAY 16TH</li><li>07</li><li>ANALOG DELAY — MODERN</li><li>08</li><li>ANALOG DELAY RETRO</li></ol></article>
+              <article class="preset-card"><h3>COMPRESSOR · UNI COMP DOWN</h3><ol><li>01</li><li>COMP — SETTING 1</li><li>02</li><li>COMP — SETTING 2</li><li>03</li><li>COMP — SETTING 3</li><li>04</li><li>COMP — SETTING 4</li><li>05</li><li>COMP — SETTING 5</li><li>06</li><li>COMP — SETTING 6</li><li>07</li><li>COMP — SETTING 7</li><li>08</li><li>COMP — SETTING 8</li></ol></article>
+              <article class="preset-card"><h3>DISTORTION · MASTER</h3><ol><li>01</li><li>WAVE FOLDER — SATURATION</li><li>02</li><li>COMP DISTORTION</li><li>03</li><li>WAVE FOLDER</li><li>04</li><li>AMP SIMULATOR 2 — SETTING 1</li><li>05</li><li>AMP SIMULATOR 1</li><li>06</li><li>AMP SIMULATOR 2 — SETTING 2</li><li>07</li><li>BIT CRUSHER</li><li>08</li><li>DIGITAL TURNTABLE</li></ol><p class="preset-scope">Single differs at 02–04 and 06: AMP SIMULATOR 2 — SETTING 1; AMP SIMULATOR 2 — SETTING 2; JAZZ COMBO; SMALL STEREO.</p></article>
+              <article class="preset-card"><h3>MODULATION</h3><ol><li>01</li><li>SPX CHORUS</li><li>02</li><li>TEMPO FLANGER</li><li>03</li><li>TEMPO PHASER</li><li>04</li><li>ENSEMBLE DETUNE</li><li>05</li><li>AUTO PAN</li><li>06</li><li>TREMOLO</li><li>07</li><li>VCM AUTO WAH</li><li>08</li><li>RING MODULATOR</li></ol></article>
+              <article class="preset-card"><h3>DUCKER · UNI COMP DOWN</h3><ol><li>01</li><li>DUCKER — SETTING 1</li><li>02</li><li>DUCKER — SETTING 2</li><li>03</li><li>DUCKER — SETTING 3</li><li>04</li><li>DUCKER — SETTING 4</li><li>05</li><li>DUCKER — SETTING 5</li><li>06</li><li>DUCKER — SETTING 6</li><li>07</li><li>DUCKER — SETTING 7</li><li>08</li><li>DUCKER — SETTING 8</li></ol></article>
+              <article class="preset-card"><h3>OTHER</h3><ol><li>01</li><li>BEAT REPEAT</li><li>02</li><li>TALKING MODULATOR</li><li>03</li><li>ROTARY SPEAKER 1 — SLOW</li><li>04</li><li>ROTARY SPEAKER 2 — FAST</li><li>05</li><li>HARMONIC ENHANCER</li><li>06</li><li>AUTO SYNTH</li><li>07</li><li>SLICE</li><li>08</li><li>VINYL BREAK</li></ol></article>
+            </div>
+            <p class="study-label" style="margin-top:22px">Send effects · shared effect banks</p>
+            <div class="preset-index">
+              <article class="preset-card"><h3>SEND REVERB</h3><ol><li>01</li><li>HD ROOM</li><li>02</li><li>R3 ROOM</li><li>03</li><li>R3 HALL</li><li>04</li><li>HD HALL</li><li>05</li><li>R3 PLATE</li><li>06</li><li>HD PLATE</li><li>07</li><li>SPX STAGE</li><li>08</li><li>REV X HALL</li></ol></article>
+              <article class="preset-card"><h3>SEND DELAY</h3><ol><li>01</li><li>TEMPO DELAY 4TH</li><li>02</li><li>PING PONG DELAY 4TH</li><li>03</li><li>TEMPO DELAY 8TH DOT</li><li>04</li><li>TEMPO DELAY 8TH</li><li>05</li><li>PING PONG DELAY 8TH</li><li>06</li><li>TEMPO DELAY 16TH</li><li>07</li><li>ANALOG DELAY — MODERN</li><li>08</li><li>ANALOG DELAY RETRO</li></ol></article>
+            </div>
+            <p class="study-label" style="margin-top:22px">Parameter labels · vary by selected preset</p>
+            <div class="parameter-reference">
+              <div><b>FILTER</b><p>Cutoff · resonance · output level</p></div>
+              <div><b>REVERB</b><p>Dry / wet · reverb time · LPF cutoff; GATED REVERB uses room size.</p></div>
+              <div><b>DELAY</b><p>Dry / wet · delay time · feedback. Cross delay exposes left-to-right and right-to-left times.</p></div>
+              <div><b>COMPRESSOR</b><p>Ratio · threshold · make-up gain</p></div>
+              <div><b>DISTORTION</b><p>Preset-dependent: dry / wet, overdrive, fold, input level, cutoff, presence, sample rate or bit depth.</p></div>
+              <div><b>MODULATION</b><p>Preset-dependent: LFO speed / depth, detune, spread, feedback, output and other documented controls.</p></div>
+              <div><b>DUCKER</b><p>Side-chain level · attack · release</p></div>
+              <div><b>OTHER</b><p>Preset-dependent controls include repeat length, gate time, play speed, freeze, drive and slice division.</p></div>
+              <div><b>SEND REVERB</b><p>Reverb time · room size · diffusion · plate type · high damp and LPF cutoff.</p></div>
+              <div><b>SEND DELAY</b><p>Delay time · feedback level · high damp; analog presets also expose delay input level.</p></div>
+            </div>
+            <p class="caution">Names follow the supplied SEQTRAK guide. Distortion presets 2–6 differ between MASTER and SINGLE. Parameter names and values must be shown only when received from a supported data source.</p>
+            <table class="assignment-table"><thead><tr><th>Target / page</th><th>FX LEVEL</th><th>HIGH PASS</th><th>REPEATER</th></tr></thead><tbody><tr><td>MASTER · 1</td><td>Master parameter 1</td><td>High pass cutoff</td><td>Beat repeat length</td></tr><tr><td>MASTER · 2</td><td>Master parameter 1</td><td>Master parameter 2</td><td>Master parameter 3</td></tr><tr><td>SINGLE · 1</td><td>Single parameter 1</td><td>High pass cutoff</td><td>Beat repeat length</td></tr><tr><td>SINGLE · 2</td><td>Single parameter 1</td><td>Single parameter 2</td><td>Single parameter 3</td></tr></tbody></table>
+            <p class="caution">Page switching is a simulator aid in this concept. The page button is not drawn on the FX hardware unit. Strip values are shown only when known.</p>
+          </div>
+        </div>
+      </section>
+      <section class="chapter" id="performance">
+        <div class="chapter-title"><p class="section-index">04 / Performance</p><h2>Stay in<br>the moment.</h2></div>
+        <div>
+          <p class="chapter-copy">Performance status stays glanceable and follows the instrument. A live note is reduced to its pitch class on SYNTH tracks; recording, tempo, mute, and volume appear only when their state is actually received.</p>
+          <div class="study-board">
+            <p class="study-label">Live state · no invented readings</p>
+            <div class="performance"><div><span>REC STATE</span><b class="unknown">—</b></div><div><span>HELD NOTE</span><b class="unknown">—</b></div></div>
+            <span class="micro-copy">Synth key readout · pitch class only · illustrative note set</span>
+            <div class="note-classes" aria-label="Twelve note names shown without octave"><span>C</span><span>C♯</span><span>D</span><span>D♯</span><span>E</span><span>F</span><span>F♯</span><span>G</span><span>G♯</span><span>A</span><span>A♯</span><span>B</span></div>
+            <div class="state-list"><div><span class="micro-copy">Tempo</span><b class="unknown">BPM —</b><p>Only a value confirmed from the instrument is shown.</p></div><div><span class="micro-copy">Track mute</span><b class="unknown">UNKNOWN</b><p>Mute state is distinct from the MUTE modifier being held.</p></div><div><span class="micro-copy">Master volume</span><b class="unknown">UNKNOWN</b><p>Not inferred from the side-button press alone.</p></div><div><span class="micro-copy">Recording</span><b class="unknown">NOT RECEIVED</b><p>REC lights only when recording state is detected.</p></div></div>
+            <div class="mute-flow"><div><span class="micro-copy">Enter</span><b>ALL + MUTE</b><p>Hold ALL while pressing MUTE.</p></div><div><span class="micro-copy">Toggle</span><b>TRACK KNOB</b><p>Press a track knob to mute or unmute that track.</p></div><div><span class="micro-copy">Clear</span><b>ALL KNOB</b><p>Press ALL to unmute all tracks.</p></div><div><span class="micro-copy">Exit</span><b>MUTE</b><p>Press MUTE to leave mute mode.</p></div></div>
+            <p class="caution">USB MIDI can provide received Note, CC, Program Change, and SysEx messages. BPM, physical REC state, master volume, and saved patterns remain unknown unless a verified message mapping is available.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer><span>SEQTRAK Field Display · Structure Study</span><span>USB MIDI input · receive only · hardware unverified</span></footer>
+  </main>
+  <script>
+    window.addEventListener("DOMContentLoaded", function () {
+      const buttons = Array.from(document.querySelectorAll(".track-select"));
+      const simulatorFrame = document.getElementById("simulatorFrame");
+      const title = document.getElementById("trackTitle");
+      const family = document.getElementById("screenFamily");
+      const primary = document.getElementById("screenPrimary");
+      const secondary = document.getElementById("screenSecondary");
+      const detail = document.getElementById("screenDetail");
+      const parameter = document.getElementById("screenParameter");
+      const visual = document.getElementById("trackVisual");
+      const connectionState = document.getElementById("screenConnectionState");
+      const sourceStamp = document.getElementById("displaySourceStamp");
+      const drumSteps = Array.from(document.querySelectorAll("#drumPatternSteps i"));
+      const trackNumbers = { "KICK": "01", "SNARE": "02", "CLAP": "03", "HAT 1": "04", "HAT 2": "05", "PERC 1": "06", "PERC 2": "07", "SYNTH 1": "08", "SYNTH 2": "09", "DX": "10", "SAMPLER": "11" };
+      let currentTrack = "KICK";
+      let simulatorReady = false;
+      let lastRealtimeLogAt = 0;
+      let suppressedRealtimeCount = 0;
+      const demoPatterns = {
+        "KICK": [1, 5, 9, 13],
+        "SNARE": [5, 13],
+        "CLAP": [5, 13],
+        "HAT 1": [1, 3, 5, 7, 9, 11, 13, 15],
+        "HAT 2": [3, 7, 11, 15],
+        "PERC 1": [1, 6, 9, 15],
+        "PERC 2": [4, 8, 12, 16]
+      };
+
+      function selectTrack(track, syncSimulator) {
+        const button = buttons.find(function (item) { return item.dataset.track === track; });
+        if (!button) return;
+        const kind = button.dataset.family;
+        currentTrack = track;
+        buttons.forEach(function (item) {
+          item.setAttribute("aria-pressed", String(item.dataset.track === track));
+        });
+        title.textContent = track + " / " + (track === "DX" ? "FM SYNTH" : kind.toUpperCase());
+        family.textContent = kind === "drum" ? "DRUM / " + track : kind === "sampler" ? "SAMPLE / LOOP" : track === "DX" ? "DX / FM SOUND" : "SYNTH / NOTE";
+        sourceStamp.textContent = "SIMULATED";
+        connectionState.textContent = "NO MIDI DATA";
+        visual.dataset.mode = kind;
+        const activeSteps = demoPatterns[track] || [];
+        drumSteps.forEach(function (step, index) {
+          step.classList.toggle("is-active", activeSteps.includes(index + 1));
+        });
+
+        if (syncSimulator !== false && simulatorReady) {
+          const targetOrigin = window.location.protocol === "file:" ? "*" : window.location.origin;
+          simulatorFrame.contentWindow.postMessage({ type: "seqtrak-select-channel", channel: Number(trackNumbers[track]) }, targetOrigin);
+        }
+
+        if (kind === "drum") {
+          primary.textContent = "SOUND NAME";
+          secondary.textContent = "NOT RECEIVED";
+          detail.textContent = "16-STEP PATTERN · EXAMPLE";
+          parameter.textContent = "DECAY —";
+        } else if (kind === "synth") {
+          primary.textContent = track === "DX" ? "FM SOUND" : "HELD NOTE";
+          secondary.textContent = "— / PITCH CLASS";
+          detail.textContent = track === "DX" ? "FM ALGORITHM —" : "KEY INPUT · NOTE ONLY";
+          parameter.textContent = track === "DX" ? "MOD AMOUNT —" : "SOUND NAME —";
+        } else {
+          primary.textContent = "SAMPLE NAME";
+          secondary.textContent = "NOT RECEIVED";
+          detail.textContent = "WAVEFORM · SCHEMATIC";
+          parameter.textContent = "LOOP —";
+        }
+      }
+
+      const pitchClasses = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+      function showReceivedMidi(message) {
+        const track = Object.keys(trackNumbers).find(function (name) { return trackNumbers[name] === String(message.channel).padStart(2, "0"); });
+        if (track) selectTrack(track, false);
+        sourceStamp.textContent = "MIDI RX";
+        connectionState.textContent = "MIDI INPUT · RECEIVED";
+        if (message.type === "NOTE ON" || message.type === "NOTE OFF") {
+          const pitch = pitchClasses[message.note % 12];
+          primary.textContent = "NOTE " + pitch;
+          secondary.textContent = message.type === "NOTE ON" ? "HELD · CH " + String(message.channel).padStart(2, "0") : "RELEASED";
+          detail.textContent = "MIDI NOTE " + message.note + " · PITCH CLASS ONLY";
+          parameter.textContent = message.type === "NOTE ON" ? "VELOCITY " + message.velocity : "NOTE OFF";
+        } else if (message.type === "CONTROL CHANGE") {
+          const decoded = window.SeqtrakDisplayState.decodeControlChange(message.channel, message.controller, message.value);
+          primary.textContent = decoded.ok ? decoded.name : "CC " + message.controller;
+          secondary.textContent = "VALUE " + message.value;
+          detail.textContent = decoded.ok ? "DOCUMENTED CC · CH " + String(message.channel).padStart(2, "0") : "UNMAPPED CC · CH " + String(message.channel).padStart(2, "0");
+          parameter.textContent = "CC " + message.controller;
+        } else if (message.type === "PROGRAM CHANGE") {
+          const trackName = track ? track.replace(/\b(HAT|PERC|SYNTH)\s+(\d+)\b/gi, "$1$2") : "TRACK";
+          primary.textContent = trackName + " / VALUE " + message.program + " · SOUND NAME UNKNOWN";
+          secondary.textContent = "";
+          detail.textContent = "PROGRAM CHANGE · CH " + String(message.channel).padStart(2, "0");
+          parameter.textContent = "PRESET NOT IDENTIFIED";
+        } else if (message.type === "SYSEX") {
+          primary.textContent = "SYSEX RECEIVED";
+          secondary.textContent = "NOT DECODED";
+          detail.textContent = "RAW BYTES · LOGGED";
+          parameter.textContent = "NO VERIFIED MAP";
+        } else {
+          primary.textContent = message.type;
+          secondary.textContent = "MIDI INPUT";
+          detail.textContent = "RAW MESSAGE · LOGGED";
+          parameter.textContent = "—";
+        }
+      }
+
+      function appendMidiLog(received) {
+        const log = document.getElementById("midiReceiveLog");
+        const message = window.SeqtrakMidiConnection.classify(received.data);
+        if (message.type === "SYSTEM REALTIME") {
+          const now = Date.now();
+          if (now - lastRealtimeLogAt < 1000) { suppressedRealtimeCount += 1; return; }
+          message.coalescedCount = suppressedRealtimeCount;
+          suppressedRealtimeCount = 0;
+          lastRealtimeLogAt = now;
+        }
+        const time = new Date().toLocaleTimeString();
+        const record = Object.assign({ time: time, input: received.portName, rawHex: received.data.map(function (byte) { return byte.toString(16).toUpperCase().padStart(2, "0"); }).join(" ") }, message);
+        if (log.textContent === "No MIDI messages received.") log.textContent = "";
+        log.textContent += JSON.stringify(record) + "\n";
+        const rows = log.textContent.trimEnd().split("\n");
+        if (rows.length > 60) log.textContent = rows.slice(-60).join("\n") + "\n";
+        log.scrollTop = log.scrollHeight;
+        showReceivedMidi(message);
+        const targetOrigin = window.location.protocol === "file:" ? "*" : window.location.origin;
+        if (simulatorReady) simulatorFrame.contentWindow.postMessage({ type: "seqtrak-midi-event", data: received.data, portName: received.portName }, targetOrigin);
+      }
+
+      const midiReceiver = window.SeqtrakMidiConnection.createReceiver({
+        onStatus: function (result) {
+          const status = document.getElementById("midiConnectionStatus");
+          const connect = document.getElementById("midiConnect");
+          const disconnect = document.getElementById("midiDisconnect");
+          const input = document.getElementById("midiInputSelect");
+          status.textContent = result.message;
+          status.dataset.state = result.status;
+          connect.disabled = result.status !== "disconnected";
+          disconnect.disabled = result.status === "disconnected";
+          input.disabled = result.status === "disconnected";
+          if (result.status === "disconnected") {
+            sourceStamp.textContent = "SIMULATED";
+            connectionState.textContent = "NO MIDI DATA";
+            selectTrack(currentTrack, false);
+          } else if (result.status === "listening") {
+            sourceStamp.textContent = "SIMULATED";
+            selectTrack(currentTrack, false);
+            connectionState.textContent = "WAITING FOR MIDI";
+          }
+        },
+        onInputs: function (ports, selectedId) {
+          const select = document.getElementById("midiInputSelect");
+          const previous = selectedId || select.value;
+          select.replaceChildren(new Option("Choose MIDI input", ""));
+          ports.forEach(function (port) {
+            const details = [port.name, port.manufacturer].filter(Boolean).join(" · ");
+            select.add(new Option(details || port.name, port.id));
+          });
+          select.value = previous;
+          select.disabled = ports.length === 0;
+        },
+        onMessage: appendMidiLog
+      });
+
+      document.getElementById("midiConnect").addEventListener("click", async function () {
+        const button = this;
+        button.disabled = true;
+        try { await midiReceiver.connect(); }
+        catch (error) {
+          document.getElementById("midiConnectionStatus").textContent = error.message;
+          document.getElementById("midiConnectionStatus").dataset.state = "error";
+          button.disabled = false;
+        }
+      });
+      document.getElementById("midiDisconnect").addEventListener("click", function () { midiReceiver.disconnect(); });
+      document.getElementById("midiInputSelect").addEventListener("change", async function () {
+        try { await midiReceiver.selectInput(this.value); }
+        catch (error) {
+          document.getElementById("midiConnectionStatus").textContent = error.message;
+          document.getElementById("midiConnectionStatus").dataset.state = "error";
+        }
+      });
+
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () { selectTrack(button.dataset.track); });
+      });
+      simulatorFrame.addEventListener("load", function () {
+        simulatorReady = true;
+        selectTrack(currentTrack);
+      });
+      window.addEventListener("message", function (event) {
+        if (event.origin !== window.location.origin || event.source !== simulatorFrame.contentWindow) return;
+        if (!event.data || event.data.type !== "seqtrak-track-selected") return;
+        const track = Object.keys(trackNumbers).find(function (name) { return trackNumbers[name] === String(event.data.channel).padStart(2, "0"); });
+        if (track) selectTrack(track, false);
+      });
+      selectTrack("KICK", false);
+    });
+  </script>
+</body>
+</html>

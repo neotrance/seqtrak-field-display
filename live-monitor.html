@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SEQTRAK FIELD DISPLAY · LIVE MONITOR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles-live-monitor.css">
+    <script src="js/pixelarticons.js" defer></script>
+    <script src="js/live-monitor-midi.js" defer></script>
+    <script src="js/live-monitor-state.js" defer></script>
+    <script src="js/live-monitor.js" defer></script>
+  </head>
+  <body class="live-monitor-page" data-theme="dark">
+    <header class="page-header">
+      <div class="header-main">
+        <h1>SEQTRAK / FIELD DISPLAY <span>LIVE MONITOR</span></h1>
+        <p>Receive-only MIDI view for note activity and incoming MIDI Clock. No MIDI data is sent to the instrument.</p>
+      </div>
+      <div class="header-tools live-header-tools">
+        <nav class="mode-switch" aria-label="Display mode">
+          <a href="index.html">SIMULATOR</a>
+          <a href="live-monitor.html" aria-current="page">LIVE MONITOR</a>
+        </nav>
+        <button id="themeToggle" type="button" aria-pressed="false">LIGHT MODE</button>
+      </div>
+    </header>
+
+    <main class="live-main">
+      <section class="live-overview" aria-label="Live external display and MIDI connection">
+        <div class="live-display-column">
+          <div class="live-unit-label"><span>EXTERNAL DISPLAY</span><span>320 × 170</span></div>
+          <div class="live-screen"><canvas id="liveDisplay" width="1280" height="680" aria-label="Live 320 by 170 pixel external display preview"></canvas></div>
+          <p class="live-caption">At-a-glance view · live input only</p>
+          <div class="live-page-switch" role="group" aria-label="Live display page">
+            <button id="livePageTracks" type="button" aria-pressed="true">TRACKS</button>
+            <button id="livePageFx" type="button" aria-pressed="false">FX</button>
+          </div>
+        </div>
+
+        <section class="live-connection" aria-labelledby="connectionHeading">
+          <h2 id="connectionHeading">MIDI INPUT</h2>
+          <p class="live-help">Connect the SEQTRAK by USB, then allow MIDI input in Chrome. A matching SEQTRAK/Yamaha port is selected automatically; a single available input is also selected automatically.</p>
+          <div class="live-actions">
+            <button id="liveConnect" type="button">CONNECT MIDI</button>
+            <button id="liveDisconnect" type="button" disabled>DISCONNECT</button>
+          </div>
+          <label for="liveInputSelect">MIDI INPUT PORT</label>
+          <select id="liveInputSelect" disabled><option value="">CONNECT MIDI TO LIST INPUTS</option></select>
+          <p id="liveConnectionStatus" class="live-status" data-state="disconnected" role="status">Not connected. Use Chrome on HTTPS or localhost.</p>
+          <p id="liveClockStatus" class="clock-status" data-state="missing">CLOCK NOT RECEIVED</p>
+          <p class="live-limit">Channel order follows the Yamaha guide; confirm actual event output with the instrument. Clock BPM and the 16-step position are estimates. FX types and on/off states are unavailable unless MIDI provides them.</p>
+        </section>
+      </section>
+
+      <section class="monitor-section event-section" aria-labelledby="eventHeading">
+        <div class="section-heading">
+          <div>
+            <p class="live-kicker">NOTE · VELOCITY · TRANSPORT</p>
+            <h2 id="eventHeading">RECEIVED EVENTS</h2>
+          </div>
+          <div class="log-actions">
+            <button id="liveLogCopy" type="button">COPY LOG</button>
+            <button id="liveLogClear" type="button">CLEAR</button>
+          </div>
+        </div>
+        <pre id="liveEventLog" aria-live="polite">No live MIDI events received.</pre>
+      </section>
+    </main>
+  </body>
+</html>
