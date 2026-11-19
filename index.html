@@ -14,6 +14,7 @@
     <script src="js/display-state.js" defer></script>
     <script src="js/fx-model.js" defer></script>
     <script src="js/fx-unit.js" defer></script>
+    <script src="js/pixelarticons.js" defer></script>
     <script src="js/display-renderer.js" defer></script>
     <style>
       :root {
@@ -78,19 +79,27 @@
       }
       .display-unit { width: 100%; max-width: 330px; margin: 0 auto; }
       .unit-label { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 9px; color: var(--muted); font: 10px var(--mono); letter-spacing: .1em; }
-      .bezel { padding: 12px; border: 1px solid #555b60; border-radius: 12px; background: linear-gradient(145deg, #363a3e, #151719 72%); box-shadow: 0 18px 35px #0008, inset 0 1px #ffffff12; }
+      .bezel { padding: 12px; border: 1px solid #555b60; border-radius: 12px; background: linear-gradient(145deg, #363a3e, #151719 72%); box-shadow: none; }
       .screen { overflow: hidden; width: 100%; border: 1px solid #08090a; border-radius: 3px; background: #080a0c; }
       #display { display: block; width: 100%; height: auto; aspect-ratio: 320 / 170; }
       .bezel-mark { display: flex; justify-content: space-between; margin: 9px 1px 0; color: #a2a7ab; font: 9px var(--mono); letter-spacing: .12em; }
       .device-wrap { min-width: 0; }
       .device-caption { display: flex; justify-content: space-between; gap: 12px; margin: 0 2px 9px; color: var(--muted); font: 10px var(--mono); letter-spacing: .1em; }
-      .device-svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 16px 18px #0007); }
+      .device-svg { display: block; width: 100%; height: auto; filter: none; }
       .track-knob { cursor: pointer; touch-action: none; outline: none; }
       .track-knob .select-ring { fill: none; stroke: #171a1b; stroke-width: 2.5; opacity: 0; }
       .track-knob.active .select-ring, .track-knob:focus-visible .select-ring { opacity: 1; }
       .track-knob.active .knob-cap { fill: #fff; stroke: #111416; stroke-width: 2.5; }
       .track-knob:active .knob-cap { fill: #c5c8c9; }
       .all-knob .select-ring { stroke-dasharray: 3 3; }
+      .track-knob.muted .knob-cap { fill: #d6ead9; stroke: #4d8058; }
+      .track-knob.solo .knob-cap { fill: #d5edf2; stroke: #327d8c; }
+      .track-knob.all-knob.mute-mode .select-ring { stroke: #398453; stroke-dasharray: none; opacity: 1; }
+      .hardware-side-control { cursor: pointer; fill: transparent; stroke: transparent; stroke-width: 1; outline: none; touch-action: manipulation; }
+      .hardware-side-control:hover { fill: var(--accent); fill-opacity: .12; }
+      .hardware-side-control:active, .hardware-side-control.held { fill: var(--accent); fill-opacity: .26; stroke: var(--accent); }
+      .hardware-side-control:focus-visible { stroke: var(--accent); stroke-width: 2; }
+      .hardware-side-control[aria-pressed="true"] { fill: var(--accent); fill-opacity: .22; stroke: var(--accent); }
       .drum-hardware-step { cursor: pointer; outline: none; touch-action: manipulation; }
       .drum-hardware-step .step-hit { fill: transparent; stroke: transparent; }
       .drum-hardware-step .step-indicator { fill: #a44b17; opacity: 0; pointer-events: none; }
@@ -156,7 +165,8 @@
       }
       .note-key:active, .note-key[aria-pressed="true"] { border-color: #b79cff; background: #30293d; }
       :root[data-theme="light"] .note-key:active, :root[data-theme="light"] .note-key[aria-pressed="true"] { color: #f1ebff; }
-      .state-readout { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
+      .state-readout { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; }
+      .state-readout-icon { width: 14px; height: 14px; flex: 0 0 14px; fill: currentColor; }
       .note { margin: 13px 2px 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
       .demo-suite { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 14px; margin-top: 14px; }
       .demo-card { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
@@ -262,6 +272,7 @@
       .demo-card button:not(.track-button):hover:not(:disabled) { border-color: var(--text); background: var(--selected); color: var(--selected-text); }
       .demo-card .drum-step { border-radius: 0; }
       .demo-card .drum-step[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); }
+      .demo-card .drum-step.playhead { outline: 2px solid var(--text); outline-offset: 1px; }
       .demo-card details { border-top-color: var(--line); }
       #eventLog { padding-top: 10px; border-top: 1px solid var(--line); }
       .drum-hardware-step .step-indicator { fill: var(--accent); }
@@ -314,18 +325,24 @@
       body { background: var(--page); color: var(--text); }
       .page { width: min(1680px, 100%); padding: 26px clamp(20px, 5vw, 76px) 100px; }
       header {
-        align-items: flex-start;
-        flex-wrap: wrap;
-        margin: 0 0 12px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "identity tools" "summary tools";
+        align-items: start;
+        column-gap: clamp(20px, 3vw, 44px);
+        row-gap: 2px;
+        margin: 0 0 4px;
         padding: 0;
         border: 0;
       }
+      header > div:first-child { grid-area: identity; min-width: 0; }
       .header-summary {
-        flex: 1 0 100%;
-        margin: 6px 0 0;
+        grid-area: summary;
+        width: min(100%, 62ch);
+        margin: 0;
         color: var(--text);
-        font-size: 14px;
-        line-height: 1.5;
+        font-size: 13px;
+        line-height: 1.45;
       }
       .eyebrow { margin-bottom: 12px; color: var(--text); font-size: 10px; letter-spacing: .13em; }
       .eyebrow::after {
@@ -338,7 +355,7 @@
       }
       h1 {
         max-width: 100%;
-        font-size: clamp(48px, 6.3vw, 88px);
+        font-size: clamp(48px, 5.2vw, 72px);
         font-family: "Barlow Condensed", sans-serif;
         font-weight: 600;
         line-height: .96;
@@ -355,7 +372,14 @@
         white-space: nowrap;
       }
       .subtitle { max-width: 530px; margin-top: 19px; color: var(--muted); font-size: 13px; line-height: 1.65; }
-      .header-tools { margin-top: 1px; }
+      .header-tools {
+        grid-area: tools;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: clamp(12px, 1.8vw, 24px);
+        margin: 2px 0 0;
+      }
       .header-tools nav { display: flex; align-items: center; gap: clamp(12px, 2.2vw, 30px); }
       .header-tools nav a {
         color: var(--text);
@@ -366,20 +390,26 @@
       }
       .header-tools nav a:hover { color: var(--accent); }
       .header-tools button {
-        min-height: 36px;
-        padding: 0;
-        border: 0;
+        min-width: 64px;
+        min-height: 28px;
+        padding: 0 7px;
+        border: 1px solid var(--line);
         background: transparent;
         color: var(--text);
-        font: 10px var(--mono);
-        letter-spacing: .04em;
+        font: 0/1 var(--mono);
+        letter-spacing: .08em;
         text-transform: uppercase;
       }
+      .header-tools button::before {
+        content: "LIGHT";
+        font: 9px/1 var(--mono);
+      }
+      :root[data-theme="light"] .header-tools button::before { content: "DARK"; }
       .header-tools button::after {
         display: inline-block;
-        width: 8px;
-        height: 8px;
-        margin-left: 8px;
+        width: 6px;
+        height: 6px;
+        margin-left: 6px;
         background: var(--accent);
         content: "";
       }
@@ -387,9 +417,9 @@
         display: grid;
         grid-template-columns: minmax(245px, .72fr) minmax(0, 2fr);
         align-items: center;
-        gap: clamp(28px, 5vw, 72px);
+        gap: clamp(24px, 3vw, 40px);
         min-height: 0;
-        padding: 28px 0 0;
+        padding: 20px 0 0;
         overflow: visible;
         border: 0;
         border-radius: 0;
@@ -401,25 +431,29 @@
         max-width: 360px;
         margin: 0 auto;
       }
-      .unit-label, .device-caption {
+      .unit-label, .device-caption, .device-wrap::before {
+        display: flex;
+        align-items: center;
+        min-height: 12px;
         margin: 0 0 9px;
         padding: 0;
         border: 0;
-        color: var(--text);
-        font-size: 9px;
+        color: var(--muted);
+        font: 9px/1.2 var(--mono);
         letter-spacing: .13em;
       }
+      .device-wrap::before { content: "SEQTRAK HARDWARE"; }
       .bezel {
         padding: 8px;
         border: 1px solid #55564f;
         border-radius: 0;
         background: #22231f;
-        box-shadow: 0 24px 55px #17181530;
+        box-shadow: none;
       }
       .screen { border-radius: 0; }
       .bezel-mark { color: #c8c8c0; }
       .device-wrap { width: 100%; min-width: 0; margin: 0; }
-      .device-caption { justify-content: flex-end; }
+      .device-caption { justify-content: space-between; }
       .device-svg { filter: none; }
       .project-statement {
         display: grid;
@@ -503,6 +537,7 @@
       .drum-hardware-step:active .step-hit { transform: translateY(1px); }
       .drum-hardware-step[aria-pressed="true"] .step-hit { fill: var(--accent); stroke: var(--accent); }
       .drum-hardware-step[aria-pressed="true"] .step-indicator { fill: #fff8ef; }
+      .drum-hardware-step.playhead .step-hit { stroke: var(--text); stroke-width: 3; }
       .drum-hardware-step[aria-disabled="true"] { opacity: .42; cursor: default; }
       .drum-hardware-step:focus-visible .step-hit { stroke: var(--accent); stroke-width: 3; }
       .synth-hardware-key { cursor: pointer; outline: none; touch-action: manipulation; }
@@ -523,15 +558,21 @@
       :root[data-theme="light"] .note-key:active, :root[data-theme="light"] .note-key[aria-pressed="true"] { color: #fff; }
       @media (max-width: 780px) {
         .page { padding: 20px 18px 64px; }
-        header { flex-direction: column; gap: 16px; margin-bottom: 0; }
-        .header-tools { align-self: flex-end; order: -1; }
+        header {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-areas: "tools" "identity" "summary";
+          row-gap: 8px;
+          margin-bottom: 0;
+        }
+        .header-tools { justify-self: end; align-self: start; margin: 0; }
         .header-tools nav { gap: 12px; }
         .header-tools nav a { font-size: 8px; }
-        .header-tools button { font-size: 8px; }
-        h1 { font-size: clamp(42px, 9vw, 68px); }
+        .header-tools button { font-size: 0; }
+        h1 { font-size: clamp(40px, 8.2vw, 64px); }
         .page h1 > span { display: block; margin: .28em 0 0; font-size: .38em; vertical-align: baseline; }
-        .subtitle { max-width: 38em; margin-top: 16px; }
-        .scene { display: flex; min-height: 0; flex-direction: column; gap: 26px; padding: 34px 0 0; overflow: visible; }
+        .header-summary { width: auto; max-width: 58ch; font-size: 12px; }
+        .subtitle { max-width: 38em; margin-top: 12px; }
+        .scene { display: flex; min-height: 0; flex-direction: column; gap: 24px; padding: 24px 0 0; overflow: visible; }
         .display-unit { position: relative; top: auto; left: auto; width: min(82%, 360px); align-self: flex-start; }
         .device-wrap { width: 100%; margin: 0; overflow-x: auto; }
         .device-caption { justify-content: space-between; }
@@ -582,18 +623,26 @@
           <div class="device-wrap">
             <svg class="device-svg" viewBox="0 0 1400 410" role="img" aria-label="Monochrome front schematic of the SEQTRAK. Drum section pads are sequence controls; the Record key and Synth performance keys are interactive previews.">
               <defs>
-                <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f7f5"/><stop offset="1" stop-color="#c9cccd"/></linearGradient>
+                <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
                 <linearGradient id="knob" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#aeb2b4"/></linearGradient>
                 <pattern id="micGrid" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="3" fill="#898e90"/></pattern>
               </defs>
-              <rect x="12" y="14" width="1376" height="382" rx="17" fill="#070809" opacity=".38"/>
-              <rect x="8" y="8" width="1376" height="382" rx="17" fill="url(#body)" stroke="#111416" stroke-width="3"/>
+              <rect x="8" y="8" width="1376" height="382" rx="17" fill="url(#body)" stroke="none"/>
               <rect x="22" y="23" width="42" height="350" rx="5" fill="#d4d6d7" stroke="#686d70"/>
               <g fill="#24282a" font-family="IBM Plex Mono, monospace" font-size="8" text-anchor="middle">
                 <text transform="translate(43 58) rotate(-90)">VOL +</text><text transform="translate(43 92) rotate(-90)">VOL -</text>
                 <text transform="translate(43 132) rotate(-90)">DELETE</text><text transform="translate(43 172) rotate(-90)">MUTE</text>
                 <text transform="translate(43 212) rotate(-90)">SOLO</text><text transform="translate(43 252) rotate(-90)">PAGE</text>
                 <text transform="translate(43 294) rotate(-90)">PLAY</text>
+              </g>
+              <g aria-label="Left-side hardware button hit areas">
+                <rect id="sideVolumeUp" class="hardware-side-control" data-side-action="volume-up" x="25" y="38" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Master volume up button" aria-pressed="false"/>
+                <rect id="sideVolumeDown" class="hardware-side-control" data-side-action="volume-down" x="25" y="72" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Master volume down button" aria-pressed="false"/>
+                <rect id="sideDelete" class="hardware-side-control" data-side-action="delete" x="25" y="116" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Delete button. Hold while pressing a target control." aria-pressed="false"/>
+                <rect id="sideMute" class="hardware-side-control" data-side-action="mute" x="25" y="156" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Mute button. Hold while pressing a track knob." aria-pressed="false"/>
+                <rect id="sideSolo" class="hardware-side-control" data-side-action="solo" x="25" y="196" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Solo button. Hold while pressing a track knob." aria-pressed="false"/>
+                <rect id="sidePage" class="hardware-side-control" data-side-action="page" x="25" y="236" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Page button" aria-pressed="false"/>
+                <rect id="sidePlay" class="hardware-side-control" data-side-action="play" x="25" y="276" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Play or stop the sequence preview" aria-pressed="false"/>
               </g>
               <rect x="70" y="23" width="470" height="210" rx="5" fill="#eceeed" stroke="#8b9092"/>
               <rect x="548" y="23" width="218" height="210" rx="5" fill="#e4e6e5" stroke="#8b9092"/>
@@ -655,20 +704,18 @@
                 <rect x="1177" y="235" width="130" height="138"/>
               </g>
               <rect x="1058" y="34" width="238" height="184" fill="url(#micGrid)"/>
-              <g fill="#303436">
-                <circle cx="1246" cy="49" r="4"/><circle cx="1264" cy="49" r="4"/><circle cx="1246" cy="67" r="4"/><circle cx="1264" cy="67" r="4"/>
-                <circle cx="1150" cy="130" r="4"/><circle cx="1168" cy="130" r="4"/><circle cx="1186" cy="130" r="4"/><circle cx="1204" cy="130" r="4"/>
-                <circle cx="1132" cy="148" r="4"/><circle cx="1150" cy="148" r="4"/><circle cx="1168" cy="148" r="4"/><circle cx="1186" cy="148" r="4"/><circle cx="1204" cy="148" r="4"/><circle cx="1222" cy="148" r="4"/>
-                <circle cx="1132" cy="166" r="4"/><circle cx="1150" cy="166" r="4"/><circle cx="1168" cy="166" r="4"/><circle cx="1186" cy="166" r="4"/><circle cx="1204" cy="166" r="4"/><circle cx="1222" cy="166" r="4"/>
-                <circle cx="1150" cy="184" r="4"/><circle cx="1168" cy="184" r="4"/><circle cx="1186" cy="184" r="4"/><circle cx="1204" cy="184" r="4"/>
-              </g>
               <rect x="1307" y="23" width="69" height="350" rx="4" fill="#d1d3d3" stroke="#777d80"/>
               <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="6.5" text-anchor="middle">
                 <text transform="translate(1341 48) rotate(90)">USB</text><text transform="translate(1341 84) rotate(90)">PHONES</text>
                 <text transform="translate(1341 120) rotate(90)">AUDIO IN</text><text transform="translate(1341 156) rotate(90)">MIDI</text>
-                <text transform="translate(1341 192) rotate(90)">VOL +</text><text transform="translate(1341 228) rotate(90)">VOL −</text>
-                <text transform="translate(1341 264) rotate(90)">BPM</text><text transform="translate(1341 300) rotate(90)">SWING</text>
-                <text transform="translate(1341 336) rotate(90)">PROJECT</text>
+                <text transform="translate(1341 192) rotate(90)">BPM +</text><text transform="translate(1341 228) rotate(90)">BPM −</text>
+                <text transform="translate(1341 264) rotate(90)">SWING</text><text transform="translate(1341 300) rotate(90)">PROJECT ↑</text>
+              </g>
+              <g aria-label="Right-side hardware button hit areas">
+                <rect id="sideBpmUp" class="hardware-side-control" data-side-action="bpm-up" x="1310" y="176" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="BPM up button" aria-pressed="false"/>
+                <rect id="sideBpmDown" class="hardware-side-control" data-side-action="bpm-down" x="1310" y="212" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="BPM down button" aria-pressed="false"/>
+                <rect id="sideSwing" class="hardware-side-control" data-side-action="swing" x="1310" y="248" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Swing button" aria-pressed="false"/>
+                <rect id="sideProject" class="hardware-side-control" data-side-action="project" x="1310" y="284" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Project up button. Hold while pressing Drum keys 1 to 8." aria-pressed="false"/>
               </g>
               <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="7.5">
                 <text x="793" y="43">SOUND</text><text x="793" y="59">PITCH</text><text x="793" y="75">MONO/POLY</text><text x="793" y="91">CHORD</text>
@@ -765,9 +812,9 @@
             <div id="drumSequenceControl">
               <label><span>DRUM SEQUENCE · 16 STEPS · PREVIEW</span></label>
               <div id="drumSteps" class="drum-steps" aria-label="Toggle simulated drum sequence steps"></div>
-              <p class="help">Toggle steps to preview a pattern. This does not read the SEQTRAK pattern.</p>
+              <p class="help">Set a preview BPM and press PLAY to move through the 16 steps. Visual simulation only; it produces no audio and does not read the SEQTRAK pattern.</p>
             </div>
-            <div class="actions"><button id="play" type="button">▶ PLAY INDICATOR</button><button id="next" type="button">NEXT SOUND →</button></div>
+            <div class="actions"><button id="play" type="button" aria-pressed="false">▶ PLAY SEQUENCE</button><button id="next" type="button">NEXT SOUND →</button></div>
           </section>
 
           <section class="demo-card">
@@ -827,7 +874,7 @@
             <a class="statement-link" href="#preview-controls">EXPLORE THE SIMULATOR</a>
           </div>
         </section>
-        <p class="note">Drag or scroll the FX knob to cycle the documented 8-category effect presets. Click MASTER/SINGLE to change the target and use the simulator FX Page control below the hardware drawing to switch parameter assignments. Drag a touch strip to adjust its assigned value. On Page 1, HIGH PASS and REPEATER stay active only while pressed and bypass on release. Click the 16 Drum-section pads to toggle preview steps; they update the display and step grid below. These controls are simulations only and produce no audio or hardware connection. Drum-section pads are sequence controls; Synth-section keys perform notes. The sounding Synth note depends on the selected track and its Scale, Key, and Octave settings, so this page's C4–B4 buttons simulate MIDI note events and do not claim a physical-key mapping. REC and note controls are simulations only: this page does not connect to SEQTRAK or detect recording state. DrumKit uses a neutral symbol when its active sound is unknown.</p>
+        <p class="note">Drag or scroll the FX knob to cycle the documented 8-category effect presets. Click MASTER/SINGLE to change the target and use the simulator FX Page control below the hardware drawing to switch parameter assignments. Drag a touch strip to adjust its assigned value. On Page 1, HIGH PASS and REPEATER stay active only while pressed and bypass on release. Click the 16 Drum-section pads to toggle preview steps; they update the display and step grid below. Hold ALL while pressing Drum keys 1–6 to queue the same pattern for all 11 tracks; double-tap a Drum key while holding ALL to switch immediately. These controls are simulations only and produce no audio or hardware connection. Drum-section pads are sequence controls; Synth-section keys perform notes. The sounding Synth note depends on the selected track and its Scale, Key, and Octave settings, so this page's C4–B4 buttons simulate MIDI note events and do not claim a physical-key mapping. REC and note controls are simulations only: this page does not connect to SEQTRAK or detect recording state. DrumKit uses a neutral symbol when its active sound is unknown.</p>
       </main>
     </div>
 
@@ -860,6 +907,7 @@
         const fxModeControl = document.getElementById("fxModeControl");
         const fxPageControl = document.getElementById("fxPageControl");
         const fxStripControls = Array.from(document.querySelectorAll(".fx-touch-strip"));
+        const hardwareSideControls = Array.from(document.querySelectorAll(".hardware-side-control"));
         const patterns = {};
         const queuedPatterns = {};
         const soundIndexes = {};
@@ -868,12 +916,21 @@
         let channel = 1;
         let trackType = "Drum";
         let allPatternMode = false;
+        let muteMode = false;
+        let muteButtonHeld = false;
+        let soloButtonHeld = false;
+        let deleteButtonHeld = false;
+        let projectButtonHeld = false;
+        let swingButtonHeld = false;
         let familyOverride = null;
         let recording = false;
         let fxUnitMode = "Single";
         let fxUnitPage = 1;
         let hardwareFxPresetIndex = 0;
         let state = Model.createInitialState();
+        state.playing = false;
+        let playheadStep = null;
+        let lastPlaybackTime = 0;
 
         ctx.setTransform(4, 0, 0, 4, 0, 0);
 
@@ -923,13 +980,18 @@
         function syncTrackSelection() {
           trackKnobs.forEach(function (knob) {
             const isAllKnob = knob.dataset.channel === "all";
-            const selected = isAllKnob ? allPatternMode : Number(knob.dataset.channel) === channel;
+            const selected = isAllKnob ? allPatternMode || muteMode : !allPatternMode && !muteMode && Number(knob.dataset.channel) === channel;
             knob.classList.toggle("active", selected);
+            knob.classList.toggle("mute-mode", isAllKnob && muteMode);
+            knob.classList.toggle("muted", !isAllKnob && Boolean(state.muteByChannel && state.muteByChannel[knob.dataset.channel]));
+            knob.classList.toggle("solo", !isAllKnob && Number(state.soloTrack) === Number(knob.dataset.channel));
             knob.setAttribute("aria-pressed", String(selected));
             if (isAllKnob) {
-              knob.setAttribute("aria-label", allPatternMode
-                ? "ALL knob held. Tap Drum key 1 to 6 to queue a pattern for all tracks; double-tap to switch immediately."
-                : "ALL knob. Rotate to change patterns on all tracks. Press to choose a pattern for all tracks.");
+              knob.setAttribute("aria-label", muteMode
+                ? "ALL knob in Mute mode. Press to unmute all tracks."
+                : allPatternMode
+                  ? "ALL knob held. Press Drum key 1 to 6 to queue that pattern for all tracks; double-tap to switch immediately."
+                  : "ALL knob. Rotate to switch all track patterns immediately; hold while rotating to queue.");
             }
           });
           channelButtons.querySelectorAll("button").forEach(function (button) {
@@ -946,10 +1008,134 @@
           syncHardwareDrumPads();
           if (allPatternMode) {
             stateReadout.textContent = "ALL KNOB HELD · DRUM KEYS 1–6: QUEUE / DOUBLE-TAP: SWITCH NOW";
+          } else if (muteMode) {
+            stateReadout.textContent = "MUTE MODE · PRESS TRACK KNOBS TO MUTE / UNMUTE";
           } else {
             refreshPreviewReadout();
           }
         }
+
+        function setMuteMode(enabled) {
+          muteMode = Boolean(enabled);
+          if (muteMode) allPatternMode = false;
+          syncTrackSelection();
+          stateReadout.textContent = muteMode
+            ? "MUTE MODE · PRESS TRACK KNOBS TO MUTE / UNMUTE"
+            : "MUTE MODE OFF";
+        }
+
+        function clearPreviewMutes() {
+          state = Object.assign({}, state, { muteByChannel: {}, view: "overview", until: 0 });
+          syncPreviewControls();
+          stateReadout.textContent = muteMode ? "ALL TRACKS UNMUTED · MUTE MODE" : "ALL TRACKS UNMUTED";
+        }
+
+        function setSideActionReadout(iconName, message) {
+          const iconPaths = window.SeqtrakPixelArtIcons;
+          const pathData = iconPaths && iconPaths[iconName];
+          if (!pathData) {
+            stateReadout.textContent = message;
+            return;
+          }
+          const safeMessage = String(message).replace(/[&<>"']/g, function (character) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[character];
+          });
+          stateReadout.innerHTML = '<svg class="state-readout-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="' + pathData + '"></path></svg><span>' + safeMessage + "</span>";
+        }
+
+        function handleTrackKnobAction(target) {
+          if (target === "all") return false;
+          const action = muteMode || muteButtonHeld ? "mute" : soloButtonHeld ? "solo" : deleteButtonHeld ? "delete" : null;
+          if (!action) return false;
+          chooseChannel(target);
+          if (action === "mute") {
+            const muteByChannel = Object.assign({}, state.muteByChannel);
+            muteByChannel[target] = !muteByChannel[target];
+            state = Object.assign({}, state, { muteByChannel: muteByChannel, view: "overview", until: 0 });
+            syncPreviewControls();
+            setSideActionReadout(muteByChannel[target] ? "mic-off" : "mic", "CH " + String(target).padStart(2, "0") + (muteByChannel[target] ? " · MUTED" : " · UNMUTED") + (muteMode ? " · MUTE MODE" : ""));
+          } else if (action === "solo") {
+            const soloTrack = state.soloTrack === target ? null : target;
+            state = Object.assign({}, state, { soloTrack: soloTrack, view: "overview", until: 0 });
+            syncPreviewControls();
+            stateReadout.textContent = soloTrack === null ? "SOLO OFF" : "SOLO TRACK " + target;
+          } else {
+            stateReadout.textContent = "DELETE + TRACK KNOB · PATTERN DATA IS NOT LOADED IN THIS PREVIEW";
+          }
+          return true;
+        }
+
+        function setSideButtonHeld(control, pressed) {
+          const action = control.dataset.sideAction;
+          control.classList.toggle("held", Boolean(pressed));
+          control.setAttribute("aria-pressed", String(Boolean(pressed)));
+          if (action === "mute") {
+            if (pressed) {
+              if (allPatternMode) {
+                setAllPatternMode(false);
+                setMuteMode(true);
+                control.dataset.skipClick = "true";
+              } else if (muteMode) {
+                setMuteMode(false);
+                control.dataset.skipClick = "true";
+              } else muteButtonHeld = true;
+            } else muteButtonHeld = false;
+          } else if (action === "solo") soloButtonHeld = Boolean(pressed);
+          else if (action === "delete") deleteButtonHeld = Boolean(pressed);
+          else if (action === "project") {
+            projectButtonHeld = Boolean(pressed);
+            syncHardwareDrumPads();
+          } else if (action === "swing") swingButtonHeld = Boolean(pressed);
+        }
+
+        function activateSideButton(control) {
+          const action = control.dataset.sideAction;
+          if (control.dataset.skipClick === "true") {
+            delete control.dataset.skipClick;
+            return;
+          }
+          if (action === "play") {
+            setSequencePlaying(!state.playing);
+          } else if (action === "bpm-up" || action === "bpm-down") {
+            if (state.bpm === null) stateReadout.textContent = "BPM UNKNOWN · SET A PREVIEW BPM BEFORE USING BPM + / −";
+            else applyBpm(state.bpm + (action === "bpm-up" ? 1 : -1), "preview");
+          } else if (action === "volume-up" || action === "volume-down") {
+            setSideActionReadout("volume", "MASTER VOL " + (action === "volume-up" ? "+" : "−") + " PRESSED · CURRENT LEVEL UNAVAILABLE");
+          } else if (action === "mute") {
+            setSideActionReadout("mic-off", "HOLD MUTE WHILE PRESSING A TRACK KNOB, OR HOLD ALL + MUTE TO ENTER MUTE MODE");
+          } else if (action === "solo") {
+            stateReadout.textContent = "HOLD SOLO WHILE PRESSING A TRACK KNOB";
+          } else if (action === "delete") {
+            stateReadout.textContent = "HOLD DELETE WHILE PRESSING A TARGET · PREVIEW DATA WILL NOT BE DELETED";
+          } else if (action === "page") {
+            stateReadout.textContent = "PAGE · THIS PREVIEW CONTAINS ONE 16-STEP PAGE";
+          } else if (action === "swing") {
+            stateReadout.textContent = "SWING · VALUE NOT AVAILABLE IN THIS PREVIEW";
+          } else if (action === "project") {
+            stateReadout.textContent = "HOLD PROJECT ↑ WHILE PRESSING DRUM KEYS 1–8 · PROJECT DATA NOT LOADED";
+          }
+        }
+
+        hardwareSideControls.forEach(function (control) {
+          control.addEventListener("pointerdown", function (event) {
+            event.preventDefault();
+            control.setPointerCapture(event.pointerId);
+            setSideButtonHeld(control, true);
+          });
+          control.addEventListener("pointerup", function () { setSideButtonHeld(control, false); });
+          control.addEventListener("pointercancel", function () { setSideButtonHeld(control, false); });
+          control.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setSideButtonHeld(control, true);
+            }
+          });
+          control.addEventListener("keyup", function (event) {
+            if (event.key === "Enter" || event.key === " ") setSideButtonHeld(control, false);
+          });
+          control.addEventListener("blur", function () { setSideButtonHeld(control, false); });
+          control.addEventListener("click", function () { activateSideButton(control); });
+        });
 
         function setAllTrackPattern(patternNumber, queued) {
           Object.keys(Model.MIDI_TRACKS).forEach(function (key) {
@@ -1021,7 +1207,46 @@
           input.value = state.bpm === null ? "" : String(state.bpm);
           document.getElementById("bpmDownPreview").disabled = state.bpm === null || state.bpm <= 5;
           document.getElementById("bpmUpPreview").disabled = state.bpm === null || state.bpm >= 300;
-          document.getElementById("play").textContent = state.playing ? "▶ PLAY INDICATOR" : "■ STOP INDICATOR";
+          const playButton = document.getElementById("play");
+          playButton.textContent = state.playing ? "■ STOP SEQUENCE" : "▶ PLAY SEQUENCE";
+          playButton.setAttribute("aria-pressed", String(state.playing));
+          const sidePlay = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "play"; });
+          if (sidePlay) {
+            sidePlay.setAttribute("aria-pressed", String(state.playing));
+            sidePlay.setAttribute("aria-label", state.playing ? "Stop the sequence preview" : "Play the sequence preview");
+          }
+        }
+
+        function setSequencePlaying(playing) {
+          const next = Boolean(playing);
+          if (next && state.bpm === null) {
+            stateReadout.textContent = "BPM UNKNOWN · SET A PREVIEW BPM TO PLAY";
+            return false;
+          }
+          if (next === state.playing) return true;
+          state.playing = next;
+          if (next) {
+            playheadStep = 0;
+            lastPlaybackTime = performance.now();
+          } else {
+            playheadStep = null;
+            lastPlaybackTime = 0;
+          }
+          syncPerformanceControls();
+          syncDrumSteps();
+          stateReadout.textContent = next ? "SEQUENCE PLAYING · STEP 01/16" : "SEQUENCE STOPPED";
+          return true;
+        }
+
+        function advanceSequence(time) {
+          if (!state.playing || state.bpm === null || playheadStep === null) return;
+          const stepDuration = 60000 / (Number(state.bpm) * 4);
+          if (!Number.isFinite(stepDuration) || stepDuration <= 0) return;
+          const elapsedSteps = Math.floor((Number(time) - lastPlaybackTime) / stepDuration);
+          if (elapsedSteps < 1) return;
+          playheadStep = (playheadStep + elapsedSteps) % 16;
+          lastPlaybackTime += elapsedSteps * stepDuration;
+          syncDrumSteps();
         }
 
         function syncDrumSteps() {
@@ -1039,6 +1264,8 @@
             button.textContent = String(index + 1).padStart(2, "0");
             button.setAttribute("aria-label", "Toggle preview step " + (index + 1));
             button.setAttribute("aria-pressed", String(active));
+            button.setAttribute("aria-current", state.playing && playheadStep === index ? "step" : "false");
+            button.classList.toggle("playhead", state.playing && playheadStep === index);
             button.addEventListener("click", function () {
               toggleDrumStep(index);
             });
@@ -1079,6 +1306,16 @@
             indicator.setAttribute("rx", "2");
             group.append(hit, indicator);
             group.addEventListener("click", function (event) {
+              if (projectButtonHeld) {
+                stateReadout.textContent = index < 8
+                  ? "PROJECT SLOT " + (index + 1) + " REQUESTED · PROJECT CONTENT NOT LOADED"
+                  : "PROJECT SELECTION USES DRUM KEYS 1–8";
+                return;
+              }
+              if (deleteButtonHeld) {
+                stateReadout.textContent = "DELETE + DRUM KEY · TARGET DATA IS NOT LOADED IN THIS PREVIEW";
+                return;
+              }
               if (allPatternMode) {
                 if (index < 6) setAllTrackPattern(index + 1, Number(event.detail) < 2);
                 return;
@@ -1088,7 +1325,13 @@
             group.addEventListener("keydown", function (event) {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                if (allPatternMode) {
+                if (projectButtonHeld) {
+                  stateReadout.textContent = index < 8
+                    ? "PROJECT SLOT " + (index + 1) + " REQUESTED · PROJECT CONTENT NOT LOADED"
+                    : "PROJECT SELECTION USES DRUM KEYS 1–8";
+                } else if (deleteButtonHeld) {
+                  stateReadout.textContent = "DELETE + DRUM KEY · TARGET DATA IS NOT LOADED IN THIS PREVIEW";
+                } else if (allPatternMode) {
                   if (index < 6) setAllTrackPattern(index + 1, true);
                 } else {
                   toggleDrumStep(index);
@@ -1106,12 +1349,18 @@
           Array.from(drumHardwareSteps.children).forEach(function (pad, index) {
             const stepModeEnabled = channel <= 7 && trackType === "Drum" && Array.isArray(pattern);
             const patternModeEnabled = allPatternMode && index < 6;
-            const enabled = allPatternMode ? patternModeEnabled : stepModeEnabled;
+            const projectModeEnabled = projectButtonHeld && index < 8;
+            const enabled = projectButtonHeld ? projectModeEnabled : allPatternMode ? patternModeEnabled : stepModeEnabled;
             pad.setAttribute("aria-disabled", String(!enabled));
-            pad.setAttribute("aria-pressed", String(Boolean(!allPatternMode && enabled && pattern[index])));
-            const label = allPatternMode
-              ? (index < 6 ? "Set pattern " + (index + 1) + " for all tracks" : "Pattern selection uses Drum keys 1 to 6")
-              : "Toggle drum sequence step " + (index + 1);
+            pad.setAttribute("aria-pressed", String(Boolean(!projectButtonHeld && !allPatternMode && enabled && pattern[index])));
+            const isPlayhead = Boolean(stepModeEnabled && state.playing && playheadStep === index);
+            pad.classList.toggle("playhead", isPlayhead);
+            pad.setAttribute("aria-current", isPlayhead ? "step" : "false");
+            const label = projectButtonHeld
+              ? (index < 8 ? "Request project slot " + (index + 1) : "Project selection uses Drum keys 1 to 8")
+              : allPatternMode
+                ? (index < 6 ? "Set pattern " + (index + 1) + " for all tracks" : "Pattern selection uses Drum keys 1 to 6")
+                : "Toggle drum sequence step " + (index + 1);
             pad.setAttribute("aria-label", label + (enabled ? "" : " (not available in this mode)"));
           });
         }
@@ -1145,15 +1394,22 @@
             face.setAttribute("width", "48");
             face.setAttribute("height", "50");
             face.setAttribute("rx", "2");
-            const mark = document.createElementNS(svgNS, "rect");
+            const mark = document.createElementNS(svgNS, isRecordKey ? "circle" : "rect");
             mark.setAttribute("class", "key-mark");
-            mark.setAttribute("x", String(centerX - 9));
-            mark.setAttribute("y", String(centerY - 2));
-            mark.setAttribute("width", "18");
-            mark.setAttribute("height", "4");
-            mark.setAttribute("rx", "2");
+            if (isRecordKey) {
+              mark.setAttribute("cx", String(centerX));
+              mark.setAttribute("cy", String(centerY));
+              mark.setAttribute("r", "2.5");
+            } else {
+              mark.setAttribute("x", String(centerX - 9));
+              mark.setAttribute("y", String(centerY - 2));
+              mark.setAttribute("width", "18");
+              mark.setAttribute("height", "4");
+              mark.setAttribute("rx", "2");
+            }
             function releaseKey() { group.classList.remove("pressed"); }
-            group.append(face, mark);
+            group.append(face);
+            group.append(mark);
             group.addEventListener("pointerdown", function (event) {
               event.preventDefault();
               group.classList.add("pressed");
@@ -1234,6 +1490,10 @@
             view: familyOverride ? "track" : "overview",
             until: 0,
             fx: previous.fx,
+            masterVolumeDisplay: previous.masterVolumeDisplay,
+            volumeByChannel: previous.volumeByChannel,
+            muteByChannel: previous.muteByChannel,
+            soloTrack: previous.soloTrack,
             recording: recording,
             drumPattern: trackType === "Drum" && channel <= 7 ? drumSequenceFor(channel).slice() : null,
             drumPatternSource: trackType === "Drum" && channel <= 7 ? "PREVIEW" : null,
@@ -1862,6 +2122,7 @@
             : state.bpmChange;
           state.bpm = value;
           state.bpmSource = source || "preview";
+          if (state.playing) lastPlaybackTime = performance.now();
           state.view = "overview";
           state.until = 0;
           syncPerformanceControls();
@@ -1997,42 +2258,92 @@
           const target = knob.dataset.channel === "all" ? "all" : Number(knob.dataset.channel);
           let drag = null;
           let suppressClick = false;
+          let allPressStarted = false;
           knob.addEventListener("pointerdown", function (event) {
             event.preventDefault();
-            if (target !== "all") chooseChannel(target);
+            if (target === "all") {
+              if (muteMode) {
+                clearPreviewMutes();
+                return;
+              }
+              if (swingButtonHeld) {
+                stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+                return;
+              }
+              allPressStarted = true;
+              setAllPatternMode(true);
+            } else {
+              if (handleTrackKnobAction(target)) return;
+              chooseChannel(target);
+            }
             drag = { pointerId: event.pointerId, lastY: event.clientY, remainder: 0, moved: false };
             knob.setPointerCapture(event.pointerId);
           });
           knob.addEventListener("pointermove", function (event) {
             if (!drag || drag.pointerId !== event.pointerId) return;
+            if (target === "all" && swingButtonHeld) {
+              stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+              return;
+            }
             drag.remainder += drag.lastY - event.clientY;
             drag.lastY = event.clientY;
             while (drag.remainder >= 14) { drag.moved = true; rotatePattern(target, 1, true); drag.remainder -= 14; }
             while (drag.remainder <= -14) { drag.moved = true; rotatePattern(target, -1, true); drag.remainder += 14; }
           });
-          function finishDrag() { suppressClick = Boolean(drag && drag.moved); drag = null; }
+          function finishDrag() {
+            suppressClick = Boolean(drag && drag.moved);
+            drag = null;
+            if (allPressStarted) {
+              allPressStarted = false;
+              setAllPatternMode(false);
+            }
+          }
           knob.addEventListener("pointerup", finishDrag);
           knob.addEventListener("pointercancel", finishDrag);
           knob.addEventListener("wheel", function (event) {
             event.preventDefault();
+            if (target === "all" && swingButtonHeld) {
+              stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+              return;
+            }
             if (target !== "all") chooseChannel(target);
             rotatePattern(target, event.deltaY < 0 ? 1 : -1, Boolean(event.shiftKey || (target === "all" && allPatternMode)));
           }, { passive: false });
           knob.addEventListener("click", function () {
-            if (target !== "all") return;
-            if (suppressClick) { suppressClick = false; return; }
-            setAllPatternMode(!allPatternMode);
+            if (target === "all" && suppressClick) suppressClick = false;
           });
           knob.addEventListener("keydown", function (event) {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
-              if (target === "all") setAllPatternMode(!allPatternMode);
-              else chooseChannel(target);
+              if (target === "all") {
+                if (muteMode) clearPreviewMutes();
+                else if (swingButtonHeld) stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+                else {
+                  allPressStarted = true;
+                  setAllPatternMode(true);
+                }
+              } else if (!handleTrackKnobAction(target)) chooseChannel(target);
             } else if (event.key === "ArrowUp" || event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "ArrowLeft") {
               event.preventDefault();
+              if (target === "all" && swingButtonHeld) {
+                stateReadout.textContent = "SWING ADJUSTMENT · VALUE NOT AVAILABLE IN THIS PREVIEW";
+                return;
+              }
               if (target !== "all") chooseChannel(target);
               const direction = event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1;
               rotatePattern(target, direction, Boolean(event.shiftKey || (target === "all" && allPatternMode)));
+            }
+          });
+          knob.addEventListener("keyup", function (event) {
+            if (target === "all" && (event.key === "Enter" || event.key === " ") && allPressStarted) {
+              allPressStarted = false;
+              setAllPatternMode(false);
+            }
+          });
+          knob.addEventListener("blur", function () {
+            if (target === "all" && allPressStarted) {
+              allPressStarted = false;
+              setAllPatternMode(false);
             }
           });
         }
@@ -2153,8 +2464,7 @@
         });
 
         document.getElementById("play").addEventListener("click", function () {
-          state.playing = !state.playing;
-          syncPerformanceControls();
+          setSequencePlaying(!state.playing);
         });
         document.getElementById("next").addEventListener("click", function () {
           if (!state.presets.length) return;
@@ -2296,6 +2606,7 @@
           if (state.view !== "overview" && state.until && Number(time) > Number(state.until)) {
             state = Object.assign({}, state, { view: "overview", until: 0 });
           }
+          advanceSequence(time);
           Renderer.render(ctx, state, time, FxModel);
           window.requestAnimationFrame(draw);
         }

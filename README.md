@@ -12,12 +12,16 @@ Instead of adding menu levels or interaction steps, the interface reveals releva
 
 ### Design principles
 
-- Distinguish KICK, SNARE, HI-HAT, BASS, and SYNTH tracks with clear graphics
+- Distinguish KICK, SNARE, CLAP, HI-HAT, PERC 1/2, BASS, SYNTH, and SAMPLER tracks with clear graphics
 - Show the preset name prominently when a sound is selected
 - Change the graphics to reflect effect types and parameters
 - Keep the workflow direct without adding menu levels
 - Use Space Grotesk and IBM Plex Mono
 - Enlarge the target display in the Mac browser preview for inspection
+
+### Icon credit
+
+The track symbols on the left side of the display use the supplied T-Rex SVG path for KICK and selected Pixelarticons for SNARE (`drum`), HI-HAT (`bell-ring`), CLAP (`hand`), PERC 1 (`notes`), PERC 2 (`music`), BASS (`audio-waveform`), SYNTH (`keyboard-music`), and SAMPLER (`mic`). Side-button feedback uses `mic-off` for MUTE and `volume` for VOL +/−. Pixelarticons is created by Gerrit Halfmann and licensed under MIT. The selected Pixelarticons SVG path data is included directly, so the project does not add an icon package dependency. Source: [Pixelarticons at GitHub](https://github.com/halfmage/pixelarticons/tree/c9ecc2d).
 
 ### Pages
 
@@ -27,7 +31,9 @@ Instead of adding menu levels or interaction steps, the interface reveals releva
 
 ### Current prototype
 
-The browser demo includes light and dark themes, track and sound previews, FX displays, MIDI event demos, BPM and note readouts, and a drum step view. In the hardware schematic, rotate the FX knob to choose from the eight documented categories and eight presets in each category, then switch the MASTER/SINGLE target. A separate simulator control switches FX pages. The touch strips follow the documented Page 1 and Page 2 assignments; HIGH PASS and REPEATER on Page 1 are active only while held. Pressing the 16 Drum Section pads toggles steps in the selected drum track's preview sequence.
+The browser demo includes light and dark themes, track and sound previews, FX displays, MIDI event demos, BPM and note readouts, and a drum step view. The ALL knob changes patterns across all 11 tracks; hold it while pressing Drum keys 1–6 to queue a pattern, or double-tap a key while holding ALL to switch immediately. Pressing and turning ALL queues a pattern change. In the hardware schematic, rotate the FX knob to choose from the eight documented categories and eight presets in each category, then switch the MASTER/SINGLE target. A separate simulator control switches FX pages. The touch strips follow the documented Page 1 and Page 2 assignments; HIGH PASS and REPEATER on Page 1 are active only while held. Pressing the 16 Drum Section pads toggles steps in the selected drum track's preview sequence.
+
+The left- and right-side button areas are interactive. PLAY moves a visual playhead through the 16-step drum preview at an explicitly set preview BPM; it produces no audio. BPM +/− adjust the preview BPM. MUTE and SOLO work with a held button and a track knob; the preview does not invent volume or swing values or load project data.
 
 These controls simulate interactions and displays. Drum steps are edited manually in this page and are not read from a pattern saved on a SEQTRAK. The simulator produces no sound.
 
@@ -67,12 +73,16 @@ SEQTRAK本体の操作感や音楽制作の流れを尊重しながら、演奏�
 
 ### デザイン方針
 
-- KICK、SNARE、HI-HAT、BASS、SYNTHをグラフィックで見分けやすくする
+- KICK、SNARE、CLAP、HI-HAT、PERC 1/2、BASS、SYNTH、SAMPLERをグラフィックで見分けやすくする
 - 音色を選んだときは、プリセット名を読み取りやすく表示する
 - エフェクトの種類とパラメーターに応じて表示を変える
 - 画面遷移を増やさず、制作やライブの流れを止めない
 - フォントはSpace GroteskとIBM Plex Monoを使用する
 - Macブラウザ用プレビューは実機想定画面を拡大して確認できるようにする
+
+### アイコンのクレジット
+
+画面左側のトラックアイコンでは、KICKに共有いただいたT-RexのSVGパスを使い、ほかのトラックにはPixelarticonsの図柄を選んでいます。SNAREは`drum`、HI-HATは`bell-ring`、CLAPは`hand`、PERC 1は`notes`、PERC 2は`music`、BASSは`audio-waveform`、SYNTHは`keyboard-music`、SAMPLERは`mic`です。サイドボタンの操作表示には、MUTEで`mic-off`、VOL＋／−で`volume`を表示します。PixelarticonsはGerrit Halfmannによるアイコンセットで、MITライセンスです。選んだSVGパスを直接収録しているため、アイコン用の外部パッケージは追加していません。出典：[Pixelarticons GitHub](https://github.com/halfmage/pixelarticons/tree/c9ecc2d)。
 
 ### ページ
 
@@ -82,7 +92,9 @@ SEQTRAK本体の操作感や音楽制作の流れを尊重しながら、演奏�
 
 ### 現在のプロトタイプ
 
-ブラウザ上でライト／ダーク表示、トラックや音色のプレビュー、FX表示、MIDIイベントのデモ、BPMやノートの表示、ドラムのステップ表示を試せます。本体図ではFXノブを回してマニュアル記載の8カテゴリー×8プリセットを選択し、MASTER/SINGLEを切り替えられます。FX Pageは本体図の外にあるシミュレーター専用操作で切り替えます。タッチストリップはマニュアルにあるPage 1/2の割当に従い、Page 1のHIGH PASSとREPEATERは押している間だけ有効になる操作を再現します。Drum Sectionの16パッドを押すと、選択中のドラムトラックのプレビューシーケンスが切り替わります。
+ブラウザ上でライト／ダーク表示、トラックや音色のプレビュー、FX表示、MIDIイベントのデモ、BPMやノートの表示、ドラムのステップ表示を試せます。ALLノブを回すと11トラックのパターンを一括変更できます。ALLノブを押しながらDrumキー1〜6を押すと全トラックの予約切り替え、押しながらダブルタップすると即時切り替え、押しながら回すと予約切り替えを再現します。本体図ではFXノブを回してマニュアル記載の8カテゴリー×8プリセットを選択し、MASTER/SINGLEを切り替えられます。FX Pageは本体図の外にあるシミュレーター専用操作で切り替えます。タッチストリップはマニュアルにあるPage 1/2の割当に従い、Page 1のHIGH PASSとREPEATERは押している間だけ有効になる操作を再現します。Drum Sectionの16パッドを押すと、選択中のドラムトラックのプレビューシーケンスが切り替わります。
+
+左右側面のボタン領域を操作できます。明示設定したプレビューBPMに合わせてPLAYで16ステップの再生ヘッドが動きます。音は出ません。BPM＋／−はプレビューに明示設定したBPMだけを調節します。MUTE／SOLOはボタンを押しながらトラックノブを操作します。取得できないボリュームやスイングの値、プロジェクト内容は推測して表示しません。
 
 これらは操作感と表示を確認するためのシミュレーションです。ドラムのステップはこのページ内で手動編集するデモであり、SEQTRAK本体に保存されたパターンを読み取ったものではありません。シミュレーションは音を出しません。
 
@@ -107,3 +119,13 @@ node --test tests/*.test.js
 ### 表記
 
 SEQTRAKはヤマハ株式会社の製品名です。このプロトタイプは独立した非公式のコンセプトであり、ヤマハ株式会社による提供・承認を示すものではありません。
+
+### Pixelarticons MIT License
+
+Copyright (c) 2019 Gerrit Halfmann
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
