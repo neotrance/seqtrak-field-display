@@ -23,6 +23,21 @@
     }
   };
 
+  // FILTER presets use the hardware's named strip assignments rather than
+  // the generic parameter 1 / 2 / 3 sequence.
+  const FILTER_STRIP_MAPPINGS = {
+    1: {
+      fxLevel: { kind: "effectParameter", number: 2 },
+      highPass: { kind: "performance", parameter: "HIGH PASS FILTER CUTOFF", effect: "highPass" },
+      repeater: { kind: "performance", parameter: "BEAT REPEAT LENGTH", effect: "repeater" }
+    },
+    2: {
+      fxLevel: { kind: "effectParameter", number: 2 },
+      highPass: { kind: "effectParameter", number: 3 },
+      repeater: { kind: "effectParameter", number: 4 }
+    }
+  };
+
   function normalizeName(value) {
     return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   }
@@ -71,8 +86,10 @@
     return sameSlot >= 0 ? sameSlot : 0;
   }
 
-  function stripMapping(page, strip) {
-    const pageMap = STRIP_MAPPINGS[Number(page)];
+  function stripMapping(page, strip, effect) {
+    const category = typeof effect === "string" ? effect : effect && effect.category;
+    const mappings = category === "FILTER" ? FILTER_STRIP_MAPPINGS : STRIP_MAPPINGS;
+    const pageMap = mappings[Number(page)];
     return pageMap && pageMap[strip] ? Object.assign({}, pageMap[strip]) : null;
   }
 

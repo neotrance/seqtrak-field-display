@@ -47,6 +47,7 @@
   const DARK_PALETTE = {
     screen: "#080A0D", text: "#F3F3EF", muted: "#A4ABB3", secondary: "#B6BCC3", subtle: "#77828B",
     neutral: "#AAB4BC", line: "#343A40", chartLine: "#273039", highlight: "#F4A86A", fxCc: "#7DD9B2",
+    stepOff: "#263238", stepOutline: "#65737A",
     mixDry: "#7DD9B2", mixWet: "#77B5F9",
     tracks: { kick: "#F6B04E", snare: "#FF6D84", hat: "#77D8F5", bass: "#8BE1A7", synth: "#B79CFF" },
     effects: { reverb: "#77B5F9", delay: "#7DD9B2", distortion: "#F4A86A", modulation: "#C6A3F6", other: "#F2D27B" }
@@ -54,6 +55,7 @@
   const LIGHT_PALETTE = {
     screen: "#F5F7F5", text: "#182326", muted: "#566469", secondary: "#46565B", subtle: "#657379",
     neutral: "#46565B", line: "#BFCBCB", chartLine: "#D3DEDD", highlight: "#A44B17", fxCc: "#087A67",
+    stepOff: "#E5E9E6", stepOutline: "#8B9694",
     mixDry: "#087A67", mixWet: "#255F9B",
     tracks: { kick: "#985900", snare: "#B52E4B", hat: "#006B83", bass: "#267343", synth: "#67499B" },
     effects: { reverb: "#255F9B", delay: "#087A67", distortion: "#A44B17", modulation: "#67499B", other: "#826000" }
@@ -113,7 +115,7 @@
     return id ? TRACK_ICON_NAMES[id] : null;
   }
 
-  function drawPixelIcon(ctx, track) {
+  function drawPixelIconAt(ctx, track, x, y, size) {
     const trackId = trackIconId(track);
     const name = trackId && TRACK_ICON_NAMES[trackId];
     const pathData = trackId && TRACK_ICON_PATHS[trackId];
@@ -128,12 +130,94 @@
       }
     }
     ctx.save();
-    ctx.translate(30, 69);
-    ctx.scale(2, 2);
+    ctx.translate(x, y);
+    const scale = size / 24;
+    ctx.scale(scale, scale);
     ctx.fillStyle = getTrackColor(track);
     ctx.fill(shape);
     ctx.restore();
     return true;
+  }
+
+  function drawPixelIcon(ctx, track) {
+    return drawPixelIconAt(ctx, track, 30, 69, 48);
+  }
+
+  const PLAYBACK_TRACKS = [
+    { channel: 1, label: "KICK", id: "kick" }, { channel: 2, label: "SNARE", id: "snare" },
+    { channel: 3, label: "CLAP", id: "clap" }, { channel: 4, label: "HAT 1", id: "hat" },
+    { channel: 5, label: "HAT 2", id: "hat" }, { channel: 6, label: "PERC 1", id: "perc1" },
+    { channel: 7, label: "PERC 2", id: "perc2" }, { channel: 8, label: "SYN 1", id: "synth" },
+    { channel: 9, label: "SYN 2", id: "synth" }, { channel: 10, label: "DX", id: "synth" },
+    { channel: 11, label: "SAMPLER", id: "sampler" }
+  ];
+
+  function noteActivity(state, channel, time) {
+    const events = Array.isArray(state.noteEvents) ? state.noteEvents : [];
+    return events.reduce(function (level, event) {
+      if (Number(event.channel) !== channel) return level;
+      const age = Math.max(0, time - Number(event.startedAt || 0));
+      let envelope = 0;
+      if (event.endedAt !== null && event.endedAt !== undefined) {
+        envelope = Math.max(0, 1 - Math.max(0, time - Number(event.endedAt)) / 180);
+      } else if (channel <= 7) {
+        envelope = age > 900 ? 0 : Math.exp(-age / 240);
+      } else {
+        envelope = age > 10000 ? 0 : 1;
+      }
+      return Math.max(level, (Math.max(0, Math.min(127, Number(event.velocity) || 0)) / 127) * envelope);
+    }, 0);
+  }
+
+  function drawPlaybackOverview(ctx, state, time) {
+    const midi = state.midiPlayback || {};
+    const useMidi = Boolean(midi.active);
+    const previewStep = Number.isInteger(state.previewPlayheadStep) ? state.previewPlayheadStep : null;
+    const currentStep = useMidi ? midi.currentStep : previewStep;
+    drawText(ctx, useMidi ? "CHANNEL ACTIVITY · MIDI INPUT" : "CHANNEL ACTIVITY", 12, 37, 7, palette.secondary, 600, "left", "data", 278);
+
+    const positions = [
+      [28, 49], [81, 49], [134, 49], [187, 49], [240, 49], [293, 49],
+      [54, 98], [107, 98], [160, 98], [213, 98], [266, 98]
+    ];
+    PLAYBACK_TRACKS.forEach(function (track, index) {
+      const position = positions[index];
+      const intensity = noteActivity(state, track.channel, time);
+      const previewHit = !useMidi && state.playing && track.channel === Number(state.deviceTrack && state.deviceTrack.channel)
+        && Array.isArray(state.drumPattern) && currentStep !== null && Boolean(state.drumPattern[currentStep]);
+      const active = Math.max(intensity, previewHit ? 1 : 0);
+      ctx.save();
+      ctx.globalAlpha = 0.22 + active * 0.78;
+      drawPixelIconAt(ctx, track, position[0] - 9, position[1], 18);
+      ctx.restore();
+      drawText(ctx, track.label, position[0], position[1] + 25, 6, active > 0.08 ? getTrackColor(track) : palette.muted, 600, "center", "data");
+      if (state.muteByChannel && state.muteByChannel[track.channel]) {
+        drawText(ctx, "M", position[0], position[1] + 33, 5, palette.highlight, 700, "center", "data");
+      } else if (Number(state.soloTrack) === track.channel) {
+        drawText(ctx, "S", position[0], position[1] + 33, 5, palette.highlight, 700, "center", "data");
+      } else if (active > 0.08) {
+        ctx.beginPath();
+        ctx.fillStyle = getTrackColor(track);
+        ctx.arc(position[0], position[1] + 31, 1.5 + active, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+
+    const startX = 12;
+    const width = 296;
+    const gap = 2;
+    const markWidth = (width - gap * 15) / 16;
+    for (let step = 0; step < 16; step++) {
+      ctx.fillStyle = currentStep === step ? palette.highlight : palette.stepOff;
+      ctx.fillRect(startX + step * (markWidth + gap), 143, markWidth, 3);
+    }
+    if (currentStep === null) {
+      drawText(ctx, useMidi ? "WAITING FOR MIDI CLOCK" : "WAITING FOR STEP DATA", 12, 162, 7, palette.muted, 500, "left", "data");
+    } else {
+      const prefix = useMidi && midi.mode === "clock-only" ? "~" : "";
+      drawText(ctx, useMidi ? (midi.mode === "clock-only" ? "CLOCK SYNC" : "MIDI PLAYBACK") : "PLAYBACK", 12, 162, 7, palette.secondary, 600, "left", "data");
+      drawText(ctx, prefix + "STEP " + String(currentStep + 1).padStart(2, "0") + " / 16", 308, 162, 7, palette.muted, 500, "right", "data");
+    }
   }
 
   function rule(ctx, x, y, x2, y2, color, width) {
@@ -271,6 +355,18 @@
     return state.track || { id: "unknown", label: "TRACK", num: "--", color: palette.neutral };
   }
 
+  function soundIdentityLabel(state, track) {
+    if (state.soundValue === null || state.soundValue === undefined || state.soundValue === "") return null;
+    const value = Number(state.soundValue);
+    if (!Number.isInteger(value) || value < 0 || value > 127) return null;
+    const sourceName = String(state.deviceTrack && state.deviceTrack.name || track.label || "TRACK");
+    const trackName = sourceName
+      .replace(/\s*\/\s*(DRUM|SYNTH|DX|SAMPLER|FM SYNTH)$/i, "")
+      .replace(/\b(HAT|PERC|SYNTH)\s+(\d+)\b/gi, "$1$2")
+      .toUpperCase();
+    return trackName + " / VALUE " + value + " · SOUND NAME UNKNOWN";
+  }
+
   function drawPresetAnnouncement(ctx, state, track, time) {
     drawText(ctx, tr(state, "newPreset"), 12, 39, 9, "#A4ABB3", 500, "left", "data");
     drawText(ctx, track.label, 12, 51, 11, getTrackColor(track), 700, "left", "display");
@@ -278,8 +374,8 @@
     rule(ctx, 94, 52, 94, 131, "#343A40", 1);
     drawText(ctx, tr(state, "soundName"), 108, 58, 8, "#9CA5AE", 500, "left", "data");
     const lines = wrapName(state.preset && state.preset.name, 20, 2);
-    drawText(ctx, lines[0] || tr(state, "presetNotReceived"), 108, 83, lines[0] && lines[0].length > 17 ? 13 : 15, "#F4F3EF", 700, "left", "display", 198);
-    if (lines[1]) drawText(ctx, lines[1], 108, 105, lines[1].length > 17 ? 13 : 15, "#F4F3EF", 700, "left", "display", 198);
+    drawText(ctx, lines[0] || tr(state, "presetNotReceived"), 108, 83, lines[0] && lines[0].length > 17 ? 16 : 18, "#F4F3EF", 700, "left", "display", 198);
+    if (lines[1]) drawText(ctx, lines[1], 108, 105, lines[1].length > 17 ? 16 : 18, "#F4F3EF", 700, "left", "display", 198);
     drawText(ctx, state.preset ? (state.preset.category || state.preset.engine || "") : tr(state, "noPresetData"), 108, 128, 8, getTrackColor(track), 500, "left", "data", 198);
     rule(ctx, 10, 140, 310, 140);
     drawText(ctx, "#" + String(state.preset && state.preset.number || "--").padStart(3, "0"), 308, 163, 10, getTrackColor(track), 600, "right", "data");
@@ -317,7 +413,8 @@
       ctx.beginPath(); ctx.fillStyle = trackColor; ctx.arc(14 + 292 * fraction, 101, 5, 0, Math.PI * 2); ctx.fill();
     }
     rule(ctx, 12, 137, 308, 137);
-    drawText(ctx, state.preset ? tr(state, "soundTag") + "  " + state.preset.name : tr(state, "presetNotReceived"), 12, 153, 8, "#B4BBC1", 500, "left", "data", 288);
+    const soundIdentity = soundIdentityLabel(state, track);
+    drawText(ctx, soundIdentity || (state.preset ? tr(state, "soundTag") + "  " + state.preset.name : tr(state, "presetNotReceived")), 12, 153, soundIdentity ? 11 : 8, soundIdentity ? palette.text : "#B4BBC1", soundIdentity ? 600 : 500, "left", "data", 288);
   }
 
   function drawFilterValueMeter(ctx, parameter, color) {
@@ -424,6 +521,7 @@
       return;
     }
     const trackColor = getTrackColor(track);
+    const soundIdentity = soundIdentityLabel(state, track);
     drawText(ctx, track.num && track.num !== "--" ? track.num + "  " + track.label : track.label, 12, 42, 14, trackColor, 700, "left", "display");
     const sourceLabel = state.source === "demo" ? tr(state, "currentSound") : state.source === "event" ? tr(state, "event") : state.source.toUpperCase();
     drawTrackStatus(ctx, state, track, sourceLabel);
@@ -432,20 +530,24 @@
     if (!drawNoteTimeline(ctx, state, track, time)) drawMotif(ctx, track, time, state.values.decay);
     rule(ctx, 10, 134, 310, 134);
     const name = state.preset && state.preset.name;
-    drawText(ctx, name || tr(state, "presetNotReceived"), 12, 153, name && name.length > 28 ? 9 : 12, "#F4F3EF", 700, "left", "display", 292);
-    drawText(ctx, state.preset ? "#" + String(state.preset.number).padStart(3, "0") : "—", 309, 166, 8, trackColor, 500, "right", "data");
+    if (soundIdentity) drawText(ctx, soundIdentity, 12, 153, 11, palette.text, 600, "left", "data", 292);
+    else {
+      drawText(ctx, name || tr(state, "presetNotReceived"), 12, 153, name && name.length > 24 ? 11 : 16, "#F4F3EF", 700, "left", "display", 292);
+      drawText(ctx, state.preset ? "#" + String(state.preset.number).padStart(3, "0") : "—", 309, 166, 8, trackColor, 500, "right", "data");
+    }
   }
 
-  function drawDrumStepGrid(ctx, pattern, trackColor, x, y, cellHeight) {
+  function drawDrumStepGrid(ctx, pattern, trackColor, x, y, cellHeight, knownSteps) {
     const width = 198;
     const gap = 2;
     const cellWidth = (width - gap * 15) / 16;
     pattern.forEach(function (active, index) {
       const left = x + index * (cellWidth + gap);
-      ctx.fillStyle = active ? trackColor : palette.chartLine;
+      const known = !Array.isArray(knownSteps) || Boolean(knownSteps[index]);
+      ctx.fillStyle = !known ? palette.screen : active ? trackColor : palette.stepOff;
       ctx.fillRect(left, y, cellWidth, cellHeight);
-      if (!active) {
-        ctx.strokeStyle = palette.line;
+      if (!active || !known) {
+        ctx.strokeStyle = known ? palette.stepOutline : palette.line;
         ctx.lineWidth = 1;
         ctx.strokeRect(left + 0.5, y + 0.5, cellWidth - 1, cellHeight - 1);
       }
@@ -470,16 +572,19 @@
   function drawDrumSequenceOverview(ctx, state, track, time) {
     const color = getTrackColor(track);
     const channel = state.deviceTrack && state.deviceTrack.channel;
+    const capturedEdit = Array.isArray(state.drumPatternKnown);
     const patternNumber = Number(state.drumPatternNumber) || 1;
-    drawText(ctx, track.num && track.num !== "--" ? track.num + "  " + track.label : track.label, 12, 42, 14, color, 700, "left", "display");
-    drawTrackStatus(ctx, state, track, state.drumPatternSource || "PREVIEW");
+    const trackName = String(state.deviceTrack && state.deviceTrack.name || track.label || "DRUM").replace(/\b(HAT|PERC|SYNTH)\s+(\d+)\b/gi, "$1$2");
+    const soundIdentity = soundIdentityLabel(state, track);
+    drawText(ctx, soundIdentity || (trackName + (capturedEdit ? " · EDIT CAPTURE" : " · PATTERN " + patternNumber)), 12, 42, 11, color, 700, "left", soundIdentity ? "data" : "display", 298);
+    drawTrackStatus(ctx, state, track, soundIdentity ? "" : state.drumPatternSource || "PREVIEW");
     drawShape(ctx, track, time);
     rule(ctx, 92, 54, 92, 130);
-    drawText(ctx, "PATTERN " + String(patternNumber).padStart(2, "0") + " · 16 STEPS · PREVIEW", 105, 58, 7, palette.secondary, 600, "left", "data", 200);
-    drawDrumStepGrid(ctx, state.drumPattern, color, 105, 65, 20);
+    drawText(ctx, capturedEdit ? "OBSERVED EDITS · 16 STEPS" : "PATTERN " + String(patternNumber).padStart(2, "0") + " · 16 STEPS", 105, 58, 7, palette.secondary, 600, "left", "data", 200);
+    drawDrumStepGrid(ctx, state.drumPattern, color, 105, 65, 20, state.drumPatternKnown);
     drawDrumDecay(ctx, state, color, 105, 107, 198, false);
     rule(ctx, 10, 139, 310, 139);
-    drawText(ctx, state.preset ? state.preset.name : tr(state, "presetNotReceived"), 12, 155, 8, palette.secondary, 500, "left", "data", 250);
+    if (!soundIdentity) drawText(ctx, state.preset ? state.preset.name : tr(state, "presetNotReceived"), 12, 155, state.preset && state.preset.name.length < 24 ? 11 : 9, palette.secondary, 500, "left", "data", 250);
     if (channel) drawText(ctx, "CH " + String(channel).padStart(2, "0"), 308, 164, 7, palette.muted, 500, "right", "data");
   }
 
@@ -496,8 +601,8 @@
       rule(ctx, 16, 78, 16 + 288 * fraction, 78, color, 4);
     }
     const patternNumber = Number(state.drumPatternNumber) || 1;
-    drawText(ctx, "PATTERN " + String(patternNumber).padStart(2, "0") + " · 16 STEPS · PREVIEW", 12, 101, 7, palette.secondary, 600, "left", "data", 294);
-    drawDrumStepGrid(ctx, state.drumPattern, color, 105, 106, 20);
+    drawText(ctx, "PATTERN " + String(patternNumber).padStart(2, "0") + " · 16 STEPS", 12, 101, 7, palette.secondary, 600, "left", "data", 294);
+    drawDrumStepGrid(ctx, state.drumPattern, color, 105, 106, 20, state.drumPatternKnown);
     if (parameter.key !== "decay") drawDrumDecay(ctx, state, color, 12, 147, 294, true);
     else drawText(ctx, "DECAY VALUE", 12, 153, 7, palette.muted, 500, "left", "data");
   }
@@ -684,15 +789,20 @@
     ctx.fillStyle = palette.screen;
     ctx.fillRect(0, 0, WIDTH, 170);
     const track = displayTrack(state);
-    const status = state.fx.controlChange
+    const status = state.playbackOverview
+      ? (state.midiPlayback && state.midiPlayback.active ? "MIDI LIVE" : "PLAYBACK")
+      : state.fx.controlChange
       ? "CC " + state.fx.controlChange.controller
       : state.source === "demo" ? "DEMO" : (state.deviceTrack ? state.deviceTrack.name : "MIDI");
-    let bpmLabel = state.bpm === null || state.bpm === undefined ? tr(state, "bpmUnknown") : "BPM " + String(state.bpm);
+    const midiBpm = state.midiPlayback && state.midiPlayback.active ? state.midiPlayback.estimatedBpm : null;
+    let bpmLabel = midiBpm !== null && midiBpm !== undefined
+      ? "BPM ~" + String(midiBpm)
+      : state.bpm === null || state.bpm === undefined ? tr(state, "bpmUnknown") : "BPM " + String(state.bpm);
     if (state.bpmChange && now - Number(state.bpmChange.at) < 1400) {
       bpmLabel += state.bpmChange.direction === "up" ? " ↑" : " ↓";
     }
     drawText(ctx, "SEQTRAK", 10, 14, 10, "#F3F3EF", 700, "left", "display");
-    drawText(ctx, state.playing ? "▶" : "■", 77, 14, 9, "#B6BCC3", 500, "left", "data");
+    drawText(ctx, state.playing || state.playbackOverview ? "▶" : "■", 77, 14, 9, "#B6BCC3", 500, "left", "data");
     drawText(ctx, status, 160, 14, 8, "#77828B", 500, "center", "data");
     if (state.recording === true) {
       ctx.beginPath();
@@ -704,11 +814,19 @@
     drawText(ctx, bpmLabel, 310, 14, 9, "#B6BCC3", 500, "right", "data");
     rule(ctx, 10, 22, 310, 22);
 
+    if (state.playbackOverview) {
+      drawPlaybackOverview(ctx, state, now);
+      return;
+    }
+
     if (drawActiveNote(ctx, state.activeNote, track)) return;
 
+    const drumSoundOverview = state.view === "sound"
+      && Array.isArray(state.drumPattern)
+      && String(state.deviceTrack && state.deviceTrack.type || "").toUpperCase() === "DRUM";
     if (state.view === "parameter") drawParameter(ctx, state, track, now);
     else if (state.view === "effect") drawFx(ctx, state, now, fxModel);
-    else if (state.view === "sound") drawPresetAnnouncement(ctx, state, track, now);
+    else if (state.view === "sound" && !drumSoundOverview) drawPresetAnnouncement(ctx, state, track, now);
     else drawOverview(ctx, state, track, now);
 
     if (state.view === "effect" && state.fx.receivedSlotLabel && !state.fx.controlChange) {

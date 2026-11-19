@@ -104,6 +104,7 @@
       track: null,
       source: "demo",
       deviceTrack: null,
+      soundValue: null,
       presets: [],
       preset: null,
       selectedIndex: -1,
@@ -118,6 +119,9 @@
       noteEvents: [],
       activeNote: null,
       recording: false,
+      midiPlayback: createMidiPlaybackState(),
+      playbackOverview: false,
+      playbackFocus: false,
       currentParameter: { key: "cutoff", name: "FILTER CUTOFF", value: 74, min: 0, max: 127 },
       playing: true,
       view: "overview",
@@ -134,6 +138,79 @@
     };
   }
 
+  function createMidiPlaybackState() {
+    return {
+      mode: "unknown",
+      active: false,
+      clockTicks: 0,
+      currentStep: null,
+      lastClockAt: null,
+      clockIntervals: [],
+      estimatedBpm: null
+    };
+  }
+
+  function median(values) {
+    const ordered = values.slice().sort(function (a, b) { return a - b; });
+    if (!ordered.length) return null;
+    const middle = Math.floor(ordered.length / 2);
+    return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
+  }
+
+  function applyMidiRealtime(state, status, at) {
+    const time = Number.isFinite(Number(at)) ? Number(at) : Date.now();
+    const previous = state.midiPlayback || createMidiPlaybackState();
+    if (status === 0xfa) {
+      return Object.assign({}, state, {
+        playbackOverview: true,
+        playbackFocus: false,
+        midiPlayback: {
+          mode: "started", active: true, clockTicks: 0, currentStep: 0,
+          lastClockAt: null, clockIntervals: [], estimatedBpm: null
+        }
+      });
+    }
+    if (status === 0xfc) {
+      return Object.assign({}, state, {
+        playbackOverview: Boolean(state.playing),
+        playbackFocus: false,
+        midiPlayback: Object.assign({}, previous, { mode: "stopped", active: false })
+      });
+    }
+    if (status !== 0xf8 || previous.mode === "stopped") return state;
+
+    const gap = previous.lastClockAt === null ? null : time - previous.lastClockAt;
+    const lostClock = gap !== null && gap > 1000;
+    const resetClockPhase = previous.mode === "unknown" || previous.mode === "clock-only" && lostClock;
+    const intervals = gap !== null && gap >= 2 && gap <= 1000
+      ? previous.clockIntervals.concat([gap]).slice(-24)
+      : gap === null || resetClockPhase ? [] : [];
+    const clockTicks = resetClockPhase ? 1 : previous.clockTicks + 1;
+    const currentStep = resetClockPhase
+      ? 0
+      : clockTicks > 0 && clockTicks % 6 === 0 ? Math.floor(clockTicks / 6) % 16 : previous.currentStep;
+    const tickMs = intervals.length >= 6 ? median(intervals) : null;
+    const rawBpm = tickMs ? 60000 / (tickMs * 24) : null;
+    return Object.assign({}, state, {
+      playbackOverview: !state.playbackFocus,
+      midiPlayback: {
+        mode: previous.mode === "started" ? "started" : "clock-only",
+        active: true,
+        clockTicks: clockTicks,
+        currentStep: currentStep,
+        lastClockAt: time,
+        clockIntervals: intervals,
+        estimatedBpm: rawBpm !== null && rawBpm >= 5 && rawBpm <= 300 ? Math.round(rawBpm) : null
+      }
+    });
+  }
+
+  function midiPlaybackActive(playback, now) {
+    if (!playback || !playback.active) return false;
+    if (playback.mode !== "clock-only" || playback.lastClockAt === null) return true;
+    return Number(now) - playback.lastClockAt <= 1000;
+  }
+
   function selectFamily(state, familyId, presets, tracks, now) {
     const track = tracks.find(function (item) { return item.id === familyId; });
     if (!track) return state;
@@ -142,6 +219,7 @@
       track: track,
       source: "demo",
       deviceTrack: null,
+      soundValue: null,
       presets: options,
       preset: options.length ? options[0] : null,
       selectedIndex: options.length ? 0 : -1,
@@ -156,6 +234,7 @@
     return Object.assign({}, state, {
       source: "demo",
       preset: state.presets[index],
+      soundValue: null,
       selectedIndex: index,
       view: "sound",
       until: now + 2400,
@@ -290,6 +369,26 @@
     });
   }
 
+  function decodeStepChange(bytes) {
+    const data = Array.from(bytes || [], function (value) { return Number(value) & 0xff; });
+    const header = [0xf0, 0x43, 0x10, 0x7f, 0x1c, 0x0c, 0x70];
+    if (!header.every(function (value, index) { return data[index] === value; }) || data[data.length - 1] !== 0xf7) return null;
+    const operation = Number(data[7]);
+    const action = operation >= 0x00 && operation <= 0x0a && data.length === 15 ? "on"
+      : operation >= 0x20 && operation <= 0x2a && data.length === 11 ? "off" : null;
+    const channel = (operation & 0x1f) + 1;
+    const step = Number(data[9]) + 1;
+    if (!action || channel < 1 || channel > 11 || step < 1 || step > 128) return null;
+    return {
+      action: action,
+      channel: channel,
+      step: step,
+      note: action === "on" ? data[10] : null,
+      velocity: action === "on" ? data[11] : null,
+      gate: action === "on" ? data[12] * 128 + data[13] : null
+    };
+  }
+
   function expireView(state, now) {
     if (state.view === "overview" || !state.until || now <= state.until) return state;
     return Object.assign({}, state, { view: "overview", until: 0 });
@@ -302,10 +401,14 @@
     EFFECT_CONTROLLERS: EFFECT_CONTROLLERS,
     availablePresets: availablePresets,
     createInitialState: createInitialState,
+    createMidiPlaybackState: createMidiPlaybackState,
+    applyMidiRealtime: applyMidiRealtime,
+    midiPlaybackActive: midiPlaybackActive,
     selectFamily: selectFamily,
     selectPreset: selectPreset,
     setSoundParameter: setSoundParameter,
     decodeControlChange: decodeControlChange,
+    decodeStepChange: decodeStepChange,
     applyControlChange: applyControlChange,
     expireView: expireView,
     clamp: clamp
