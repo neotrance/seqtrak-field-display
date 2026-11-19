@@ -598,6 +598,43 @@
         .page h1 > span { font-size: .36em; }
         .display-unit { width: 90%; }
       }
+      .usb-connect-bar {
+        display: grid;
+        grid-template-columns: auto auto minmax(220px, 1fr) minmax(180px, auto);
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 18px;
+        padding: 12px 0;
+      }
+      .usb-connect-intro { min-width: 170px; }
+      .usb-connect-intro strong { display: block; font: 600 12px var(--mono); letter-spacing: .06em; }
+      .usb-connect-intro span { display: block; margin-top: 3px; color: var(--muted); font: 9px/1.4 var(--mono); }
+      .usb-connect-bar .midi-connection-actions { display: flex; gap: 6px; margin: 0; }
+      .usb-connect-bar button,
+      .usb-connect-bar select {
+        min-height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 0;
+        background: var(--control);
+        color: var(--text);
+        font: 10px var(--mono);
+      }
+      .usb-connect-bar button { padding: 0 12px; cursor: pointer; }
+      .usb-connect-bar button:disabled { cursor: not-allowed; opacity: .42; }
+      .usb-connect-bar select { width: 100%; padding: 0 10px; }
+      .usb-connect-bar .midi-connection-status { margin: 0; text-align: right; }
+      @media (max-width: 900px) {
+        .usb-connect-bar { grid-template-columns: 1fr auto; }
+        .usb-connect-bar select, .usb-connect-bar .midi-connection-status { grid-column: 1 / -1; }
+        .usb-connect-bar .midi-connection-status { text-align: left; }
+      }
+      @media (max-width: 520px) {
+        .usb-connect-bar { grid-template-columns: 1fr; }
+        .usb-connect-bar .midi-connection-actions,
+        .usb-connect-bar select,
+        .usb-connect-bar .midi-connection-status { grid-column: auto; }
+        .usb-connect-bar .midi-connection-actions button { flex: 1; }
+      }
     </style>
     <style>
       :root[data-embed="hardware"] body { min-width: 320px; }
@@ -608,6 +645,7 @@
       :root[data-embed="hardware"] .header-tools { position: absolute; top: 0; right: 0; margin: 0; }
       :root[data-embed="hardware"] .header-tools nav { display: none; }
       :root[data-embed="hardware"] .header-tools button { min-width: 64px; min-height: 26px; }
+      :root[data-embed="hardware"] .usb-connect-bar { display: none; }
       :root[data-embed="hardware"] main > *:not(#hardware-view) { display: none !important; }
       :root[data-embed="hardware"] #hardware-view { grid-template-columns: minmax(220px, 330px) minmax(0, 1fr); align-items: center; gap: clamp(14px, 2.5vw, 32px); min-height: 0; margin: 0; padding: 8px 0; border: 0; overflow: visible; }
       :root[data-embed="hardware"] .display-unit { max-width: 330px; }
@@ -642,6 +680,16 @@
         </div>
         <p class="header-summary">Sound, sequence, and performance state at a glance, so you can stay focused on the instrument.</p>
       </header>
+
+      <section class="usb-connect-bar" aria-label="Connect SEQTRAK by USB MIDI">
+        <div class="usb-connect-intro">
+          <strong>CONNECT SEQTRAK</strong>
+          <span>WEB APP · USB-MIDI · NO CUSTOM FIRMWARE</span>
+        </div>
+        <div class="midi-connection-actions"><button id="midiConnect" type="button">CONNECT</button><button id="midiDisconnect" type="button" disabled>DISCONNECT</button></div>
+        <select id="midiInputSelect" aria-label="MIDI input port" disabled><option value="">Connect to list MIDI input ports</option></select>
+        <span id="midiConnectionStatus" class="midi-connection-status" role="status">Not connected · Chrome / HTTPS required</span>
+      </section>
 
       <main>
         <section id="hardware-view" class="scene" aria-label="SEQTRAK and external display front view">
@@ -877,11 +925,8 @@
           </section>
 
           <section class="demo-card">
-            <h2>USB MIDI · RECEIVE ONLY</h2>
-            <p class="help">Connect a MIDI input in Chrome to receive Note, CC, Program Change, and SysEx messages. Documented CCs update the display; Program Change and unknown SysEx are logged without guessing sound names or decoding unverified data. This page never sends MIDI.</p>
-            <div class="midi-connection-actions"><button id="midiConnect" type="button">CONNECT MIDI</button><button id="midiDisconnect" type="button" disabled>DISCONNECT</button></div>
-            <label for="midiInputSelect"><span>MIDI INPUT PORT</span></label><select id="midiInputSelect" disabled><option value="">Connect MIDI to list input ports</option></select>
-            <span id="midiConnectionStatus" class="midi-connection-status" role="status">Not connected. Use Chrome on HTTPS or localhost.</span>
+            <h2>MIDI DEBUG / DEMO</h2>
+            <p class="help">This is a browser-based web app, not custom firmware. It reads USB-MIDI from SEQTRAK in Chrome; it never sends MIDI or modifies the instrument.</p>
             <details class="midi-log"><summary>RECEIVED MESSAGE LOG</summary><button id="midiLogCopy" class="midi-log-copy" type="button" data-copy-target="midiReceiveLog" aria-label="Copy received MIDI log">COPY LOG</button><button id="midiLogClear" class="midi-log-clear" type="button" data-clear-target="midiReceiveLog" aria-label="Clear received MIDI log">CLEAR LOG</button><pre id="midiReceiveLog" aria-live="polite">No MIDI messages received.</pre></details>
             <h2 style="margin-top:20px">DOCUMENTED MIDI CC / PERFORMANCE DEMO</h2>
             <p class="help">These manual controls remain available without a MIDI device. Track Volume CC 7 is separate from the side VOL + / VOL − controls. MUTE / SOLO CC values do not identify physical button presses.</p>
