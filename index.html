@@ -1,155 +1,2306 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SEQTRAK FIELD DISPLAY v1.3.7</title>
+    <title>SEQTRAK + FIELD DISPLAY · Hardware preview</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="data/catalog.js" defer></script>
     <script src="data/fx-specs.js" defer></script>
+    <script src="data/seqtrak-fx-presets.js" defer></script>
     <script src="js/i18n.js" defer></script>
     <script src="js/display-state.js" defer></script>
     <script src="js/fx-model.js" defer></script>
+    <script src="js/fx-unit.js" defer></script>
     <script src="js/display-renderer.js" defer></script>
-    <script src="js/app.js" defer></script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --page: #111315;
+        --panel: #1c1f22;
+        --line: #383d41;
+        --text: #f1f1ed;
+        --muted: #a4abb1;
+        --control: #202428;
+        --selected: #e9ebec;
+        --selected-text: #16191b;
+        --scene: radial-gradient(ellipse at 56% 42%, #25292c 0, #191c1f 64%, #17191b 100%);
+        --mono: "IBM Plex Mono", monospace;
+        --display: "Space Grotesk", sans-serif;
+      }
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --page: #eef2f0;
+        --panel: #ffffff;
+        --line: #c5d0ce;
+        --text: #1e2929;
+        --muted: #526465;
+        --control: #f1f5f3;
+        --selected: #263a3a;
+        --selected-text: #f6faf8;
+        --scene: radial-gradient(ellipse at 56% 42%, #ffffff 0, #e6ece9 64%, #dfe7e4 100%);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--text);
+        font-family: var(--display);
+        transition: background-color 150ms ease, color 150ms ease;
+      }
+      button, select { font: inherit; }
+      .page { width: min(1480px, 100%); margin: 0 auto; padding: 24px clamp(16px, 3vw, 42px) 40px; }
+      header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+      h1 { margin: 0; font-size: clamp(20px, 2.4vw, 30px); letter-spacing: .04em; }
+      .eyebrow, .meta, .state-readout, .field-label { font-family: var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+      .eyebrow { margin: 0 0 8px; color: var(--muted); font-size: 11px; }
+      .subtitle { max-width: 760px; margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+      .header-tools { display: flex; gap: 8px; flex-shrink: 0; }
+      .header-tools button, .track-button, select {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--control);
+        color: var(--text);
+      }
+      .header-tools button { min-height: 36px; padding: 0 12px; cursor: pointer; }
+      .scene {
+        display: grid;
+        grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+        align-items: center;
+        gap: clamp(18px, 3vw, 42px);
+        padding: clamp(16px, 2.2vw, 28px);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--scene);
+        overflow: hidden;
+      }
+      .display-unit { width: 100%; max-width: 330px; margin: 0 auto; }
+      .unit-label { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 9px; color: var(--muted); font: 10px var(--mono); letter-spacing: .1em; }
+      .bezel { padding: 12px; border: 1px solid #555b60; border-radius: 12px; background: linear-gradient(145deg, #363a3e, #151719 72%); box-shadow: 0 18px 35px #0008, inset 0 1px #ffffff12; }
+      .screen { overflow: hidden; width: 100%; border: 1px solid #08090a; border-radius: 3px; background: #080a0c; }
+      #display { display: block; width: 100%; height: auto; aspect-ratio: 320 / 170; }
+      .bezel-mark { display: flex; justify-content: space-between; margin: 9px 1px 0; color: #a2a7ab; font: 9px var(--mono); letter-spacing: .12em; }
+      .device-wrap { min-width: 0; }
+      .device-caption { display: flex; justify-content: space-between; gap: 12px; margin: 0 2px 9px; color: var(--muted); font: 10px var(--mono); letter-spacing: .1em; }
+      .device-svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 16px 18px #0007); }
+      .track-knob { cursor: pointer; touch-action: none; outline: none; }
+      .track-knob .select-ring { fill: none; stroke: #171a1b; stroke-width: 2.5; opacity: 0; }
+      .track-knob.active .select-ring, .track-knob:focus-visible .select-ring { opacity: 1; }
+      .track-knob.active .knob-cap { fill: #fff; stroke: #111416; stroke-width: 2.5; }
+      .track-knob:active .knob-cap { fill: #c5c8c9; }
+      .all-knob .select-ring { stroke-dasharray: 3 3; }
+      .drum-hardware-step { cursor: pointer; outline: none; touch-action: manipulation; }
+      .drum-hardware-step .step-hit { fill: transparent; stroke: transparent; }
+      .drum-hardware-step .step-indicator { fill: #a44b17; opacity: 0; pointer-events: none; }
+      .drum-hardware-step[aria-pressed="true"] .step-hit { fill: #d98956; fill-opacity: .28; stroke: #a44b17; stroke-width: 1.5; }
+      .drum-hardware-step[aria-pressed="true"] .step-indicator { opacity: 1; }
+      .drum-hardware-step[aria-disabled="true"] { cursor: not-allowed; opacity: .38; }
+      .drum-hardware-step:focus-visible .step-hit { stroke: #a44b17; stroke-width: 2; }
+      .fx-rotary, .fx-mode-control, .fx-page-control { cursor: pointer; outline: none; touch-action: none; }
+      .fx-rotary { cursor: grab; }
+      .fx-rotary:active { cursor: grabbing; }
+      .fx-rotary:focus-visible circle:first-child { stroke: #a44b17; stroke-width: 3; }
+      .fx-mode-control:focus-visible .fx-mode-track { stroke: #a44b17; stroke-width: 2.5; }
+      .fx-page-control { min-height: 24px; padding: 3px 8px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+      .fx-touch-strip { cursor: ns-resize; outline: none; touch-action: none; }
+      .fx-touch-strip .fx-strip-hit { fill: transparent; stroke: transparent; }
+      .fx-touch-strip .fx-touch-indicator { fill: #a44b17; stroke: #fff; stroke-width: 1; pointer-events: none; }
+      .fx-touch-strip.active .fx-strip-hit { fill: #bf6a39; fill-opacity: .18; stroke: #a44b17; stroke-width: 1.5; }
+      .fx-touch-strip.active .fx-touch-indicator { r: 5.5px; }
+      .fx-touch-strip:focus-visible .fx-strip-hit { stroke: #a44b17; stroke-width: 2; }
+      .fx-touch-strip.disabled { cursor: not-allowed; opacity: .42; }
+      .fx-unit-readout { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin: 6px 2px 0; color: var(--muted); font: 9px var(--mono); line-height: 1.5; }
+      .controls {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: end;
+        gap: 14px 20px;
+        margin-top: 18px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+      }
+      .field-label { display: block; margin: 0 0 8px; color: var(--muted); font-size: 10px; }
+      .track-list { display: flex; flex-wrap: wrap; gap: 7px; }
+      .track-button { min-height: 34px; padding: 0 10px; cursor: pointer; font: 11px var(--mono); }
+      .track-button.active { border-color: var(--selected); background: var(--selected); color: var(--selected-text); }
+      .type-control select { min-width: 150px; min-height: 38px; padding: 0 30px 0 10px; }
+      .record-control { display: grid; gap: 0; }
+      .record-toggle {
+        min-height: 38px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--control);
+        color: var(--text);
+        font: 11px var(--mono);
+        cursor: pointer;
+      }
+      .record-toggle[aria-pressed="true"] { border-color: #ff5b62; color: #ff7a80; background: #321d20; }
+      .key-control { grid-column: 1 / -1; }
+      .note-keys { display: flex; flex-wrap: wrap; gap: 6px; }
+      .note-key {
+        min-width: 39px;
+        min-height: 34px;
+        padding: 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--control);
+        color: var(--text);
+        font: 11px var(--mono);
+        cursor: pointer;
+        touch-action: none;
+      }
+      .note-key:active, .note-key[aria-pressed="true"] { border-color: #b79cff; background: #30293d; }
+      :root[data-theme="light"] .note-key:active, :root[data-theme="light"] .note-key[aria-pressed="true"] { color: #f1ebff; }
+      .state-readout { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
+      .note { margin: 13px 2px 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+      .demo-suite { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 14px; margin-top: 14px; }
+      .demo-card { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+      .demo-card h2 { margin: 0 0 14px; color: var(--text); font: 600 12px var(--mono); letter-spacing: .06em; }
+      .demo-card label { display: flex; justify-content: space-between; gap: 10px; margin: 13px 0 6px; color: var(--muted); font: 10px var(--mono); text-transform: uppercase; }
+      .demo-card select, .demo-card input:not([type="range"]) { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--control); color: var(--text); font: 11px var(--mono); }
+      .demo-card input[type="range"] { width: 100%; accent-color: #a44b17; }
+      .demo-card output { color: var(--text); }
+      .demo-card .actions { display: flex; gap: 7px; margin-top: 12px; }
+      .demo-card button:not(.track-button) { flex: 1; min-height: 34px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--control); color: var(--text); font: 10px var(--mono); cursor: pointer; }
+      .demo-card button:disabled { cursor: not-allowed; opacity: .48; }
+      .demo-card .help { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+      .demo-card .track-list { margin: 8px 0 12px; }
+      .demo-card .track-button { min-height: 30px; }
+      .demo-card .inline-fields { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+      .demo-card .inline-fields button { flex: 0 0 auto; }
+      .demo-card .note-preview-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+      .drum-steps { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
+      .demo-card .drum-step { min-width: 0; min-height: 30px; padding: 4px 2px; font-size: 9px; }
+      .demo-card .drum-step[aria-pressed="true"] { border-color: #a44b17; background: #a44b17; color: #ffffff; }
+      .demo-card details { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+      .demo-card summary { color: var(--muted); cursor: pointer; font: 10px var(--mono); }
+      #eventLog { max-height: 140px; margin: 12px 0 0; overflow: auto; color: var(--muted); font: 10px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+      @media (max-width: 1100px) { .demo-suite { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (max-width: 780px) {
+        .page { padding-top: 18px; }
+        header { flex-direction: column; }
+        .scene { grid-template-columns: minmax(0, 1fr); }
+        .display-unit { max-width: 330px; }
+        .device-wrap { width: 100%; overflow-x: auto; }
+        .device-svg { min-width: 760px; }
+        .controls { grid-template-columns: 1fr; }
+        .state-readout { grid-column: auto; }
+        .demo-suite { grid-template-columns: 1fr; }
+      }
+
+      /* Editorial, instrument-led visual treatment. Control behavior remains unchanged. */
+      :root {
+        --page: #171917;
+        --panel: #171917;
+        --line: #50534c;
+        --text: #eeede6;
+        --muted: #aaa99f;
+        --control: #1d201d;
+        --selected: #eeede6;
+        --selected-text: #1c1e1a;
+        --scene: #1a1d1a;
+        --accent: #e07858;
+      }
+      :root[data-theme="light"] {
+        --page: #f0eee7;
+        --panel: #f0eee7;
+        --line: #c4c0b6;
+        --text: #252620;
+        --muted: #737269;
+        --control: #f7f6f0;
+        --selected: #252d29;
+        --selected-text: #f8f7f0;
+        --scene: #e9e6dc;
+        --accent: #b74b34;
+      }
+      .page { width: min(1560px, 100%); padding: 30px clamp(20px, 4vw, 60px) 72px; }
+      header { align-items: end; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+      h1 { font-size: clamp(32px, 4.7vw, 64px); font-weight: 600; line-height: .98; letter-spacing: -.065em; }
+      .eyebrow { font-size: 9px; letter-spacing: .16em; }
+      .subtitle { max-width: 600px; margin-top: 12px; font-size: 13px; line-height: 1.65; }
+      .header-tools { gap: 0; }
+      .header-tools button, .track-button, select,
+      .record-toggle, .note-key, .demo-card select,
+      .demo-card input:not([type="range"]), .demo-card button:not(.track-button) {
+        border-radius: 0;
+      }
+      .header-tools button { min-height: 40px; border-color: var(--text); background: transparent; font: 10px var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+      .header-tools button:hover { background: var(--selected); color: var(--selected-text); }
+      .scene { gap: clamp(24px, 5vw, 72px); padding: clamp(20px, 3vw, 44px) 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--scene); }
+      .unit-label, .device-caption { padding-bottom: 9px; border-bottom: 1px solid var(--line); font-size: 9px; letter-spacing: .16em; }
+      .bezel { padding: 8px; border: 1px solid #363934; border-radius: 0; background: #20231f; box-shadow: none; }
+      .screen { border-radius: 0; }
+      .bezel-mark { font-size: 8px; letter-spacing: .16em; }
+      .device-svg { filter: none; }
+      .fx-unit-readout { margin-top: 0; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 8px; letter-spacing: .04em; }
+      .controls { margin-top: 0; padding: 22px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; gap: 18px 24px; }
+      .controls > div:nth-child(-n+2) { padding-right: 20px; border-right: 1px solid var(--line); }
+      .field-label { font-size: 9px; letter-spacing: .13em; }
+      .track-list { gap: 5px; }
+      .track-button { min-height: 32px; padding: 0 9px; font-size: 10px; }
+      .track-button.active { border-color: var(--selected); }
+      .type-control select { min-height: 36px; }
+      .record-toggle { border-color: var(--line); background: transparent; }
+      .record-toggle[aria-pressed="true"] { border: 1px solid #c3453c; color: #c3453c; background: transparent; }
+      .note-key { border-radius: 0; }
+      .note-key:active, .note-key[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
+      :root[data-theme="light"] .note-key:active, :root[data-theme="light"] .note-key[aria-pressed="true"] { color: #fff; }
+      .state-readout { font-size: 9px; }
+      .note { margin-top: 16px; padding-left: 11px; border-left: 2px solid var(--accent); font-size: 11px; line-height: 1.65; }
+      .demo-suite { gap: clamp(24px, 4vw, 54px); margin-top: 46px; }
+      .demo-card { padding: 13px 0 0; border: 0; border-top: 2px solid var(--text); border-radius: 0; background: transparent; }
+      .demo-card h2 { min-height: 2.8em; margin: 0 0 18px; font-size: 11px; letter-spacing: .12em; line-height: 1.5; }
+      .demo-card label { margin-top: 16px; padding-bottom: 5px; border-bottom: 1px solid var(--line); font-size: 9px; letter-spacing: .09em; }
+      .demo-card select, .demo-card input:not([type="range"]) { border-color: var(--line); background: transparent; }
+      .demo-card input[type="range"] { accent-color: var(--accent); }
+      .demo-card button:not(.track-button) { border-color: var(--line); background: transparent; }
+      .demo-card button:not(.track-button):hover:not(:disabled) { border-color: var(--text); background: var(--selected); color: var(--selected-text); }
+      .demo-card .drum-step { border-radius: 0; }
+      .demo-card .drum-step[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); }
+      .demo-card details { border-top-color: var(--line); }
+      #eventLog { padding-top: 10px; border-top: 1px solid var(--line); }
+      .drum-hardware-step .step-indicator { fill: var(--accent); }
+      .drum-hardware-step[aria-pressed="true"] .step-hit { fill: var(--accent); stroke: var(--accent); }
+      .fx-touch-strip .fx-touch-indicator { fill: var(--accent); }
+      .fx-touch-strip.active .fx-strip-hit { fill: var(--accent); stroke: var(--accent); }
+      button:focus-visible, select:focus-visible, input:focus-visible,
+      .track-knob:focus-visible, .sound-knob:focus-visible,
+      .fx-rotary:focus-visible, .fx-mode-control:focus-visible,
+      .fx-page-control:focus-visible, .fx-touch-strip:focus-visible,
+      .drum-hardware-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+      @media (max-width: 780px) {
+        .page { padding: 18px 16px 48px; }
+        header { align-items: flex-start; gap: 18px; margin-bottom: 20px; padding-bottom: 16px; }
+        h1 { font-size: clamp(32px, 10vw, 48px); }
+        .scene { gap: 28px; padding: 20px 0; }
+        .controls { gap: 18px; padding: 18px 0; }
+        .controls > div:nth-child(-n+2) { padding-right: 0; border-right: 0; }
+        .demo-suite { gap: 32px; margin-top: 32px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+      }
+
+      /* Product-led editorial layout: separate sections with space, not rules. */
+      :root {
+        --page: #1b1c19;
+        --panel: #1b1c19;
+        --line: #55564f;
+        --text: #efeee8;
+        --muted: #b2b0a6;
+        --control: #292a26;
+        --selected: #efeee8;
+        --selected-text: #171815;
+        --scene: transparent;
+        --accent: #fa5525;
+      }
+      :root[data-theme="light"] {
+        --page: #efeee8;
+        --panel: #efeee8;
+        --line: #c9c6bb;
+        --text: #171815;
+        --muted: #6e6d65;
+        --control: #e5e2d9;
+        --selected: #171815;
+        --selected-text: #f2f0e9;
+        --scene: transparent;
+        --accent: #f05424;
+      }
+      body { background: var(--page); color: var(--text); }
+      .page { width: min(1680px, 100%); padding: 26px clamp(20px, 5vw, 76px) 100px; }
+      header {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        margin: 0 0 12px;
+        padding: 0;
+        border: 0;
+      }
+      .header-summary {
+        flex: 1 0 100%;
+        margin: 6px 0 0;
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .eyebrow { margin-bottom: 12px; color: var(--text); font-size: 10px; letter-spacing: .13em; }
+      .eyebrow::after {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        margin-left: 9px;
+        background: var(--accent);
+        content: "";
+      }
+      h1 {
+        max-width: 100%;
+        font-size: clamp(48px, 6.3vw, 88px);
+        font-family: "Barlow Condensed", sans-serif;
+        font-weight: 600;
+        line-height: .96;
+        letter-spacing: -.035em;
+      }
+      .page h1 > span {
+        display: inline-block;
+        margin-left: .34em;
+        font-size: .32em;
+        font-weight: 500;
+        line-height: 1;
+        letter-spacing: .09em;
+        vertical-align: .27em;
+        white-space: nowrap;
+      }
+      .subtitle { max-width: 530px; margin-top: 19px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+      .header-tools { margin-top: 1px; }
+      .header-tools nav { display: flex; align-items: center; gap: clamp(12px, 2.2vw, 30px); }
+      .header-tools nav a {
+        color: var(--text);
+        font: 10px var(--mono);
+        letter-spacing: .04em;
+        text-decoration: none;
+        text-transform: uppercase;
+      }
+      .header-tools nav a:hover { color: var(--accent); }
+      .header-tools button {
+        min-height: 36px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        font: 10px var(--mono);
+        letter-spacing: .04em;
+        text-transform: uppercase;
+      }
+      .header-tools button::after {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-left: 8px;
+        background: var(--accent);
+        content: "";
+      }
+      .scene {
+        display: grid;
+        grid-template-columns: minmax(245px, .72fr) minmax(0, 2fr);
+        align-items: center;
+        gap: clamp(28px, 5vw, 72px);
+        min-height: 0;
+        padding: 28px 0 0;
+        overflow: visible;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+      }
+      .display-unit {
+        position: static;
+        width: min(100%, 360px);
+        max-width: 360px;
+        margin: 0 auto;
+      }
+      .unit-label, .device-caption {
+        margin: 0 0 9px;
+        padding: 0;
+        border: 0;
+        color: var(--text);
+        font-size: 9px;
+        letter-spacing: .13em;
+      }
+      .bezel {
+        padding: 8px;
+        border: 1px solid #55564f;
+        border-radius: 0;
+        background: #22231f;
+        box-shadow: 0 24px 55px #17181530;
+      }
+      .screen { border-radius: 0; }
+      .bezel-mark { color: #c8c8c0; }
+      .device-wrap { width: 100%; min-width: 0; margin: 0; }
+      .device-caption { justify-content: flex-end; }
+      .device-svg { filter: none; }
+      .project-statement {
+        display: grid;
+        grid-template-columns: minmax(200px, .65fr) minmax(0, 1.35fr);
+        align-items: start;
+        gap: 28px;
+        margin-top: 76px;
+        padding: 0;
+        background: transparent;
+        color: var(--text);
+      }
+      .statement-kicker { margin: 0 0 9px; color: var(--accent); font: 9px var(--mono); letter-spacing: .12em; }
+      .project-statement h2 { margin: 0; color: inherit; font: 500 22px/1.15 var(--display); letter-spacing: -.035em; }
+      .statement-copy { max-width: none; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+      .statement-link { display: inline-block; margin-top: 14px; color: var(--text); font: 9px var(--mono); letter-spacing: .08em; text-decoration: none; }
+      .statement-link::after { display: inline-block; width: 7px; height: 7px; margin-left: 9px; background: var(--accent); content: ""; }
+      .fx-unit-readout {
+        grid-column: 1 / -1;
+        margin: 12px 0 0;
+        padding: 0;
+        border: 0;
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .controls {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        margin: 0;
+        padding: 26px 0 24px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        gap: 28px 42px;
+      }
+      .controls > div:nth-child(-n+2) { padding: 0; border: 0; }
+      .field-label { margin-bottom: 13px; color: var(--muted); font-size: 9px; letter-spacing: .12em; }
+      .track-list { gap: 6px; }
+      .track-button, .type-control select, .record-toggle { min-height: 38px; }
+      .track-button { padding: 0 11px; }
+      .track-button.active { background: var(--selected); color: var(--selected-text); }
+      .type-control select { border: 0; background: var(--control); }
+      .record-toggle { border: 0; background: transparent; }
+      .record-toggle[aria-pressed="true"] { border: 0; color: #c43d2d; }
+      .state-readout { color: var(--text); }
+      .note {
+        max-width: 980px;
+        margin: 5px 0 0;
+        padding: 0;
+        border: 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .demo-suite { gap: 54px clamp(24px, 5vw, 76px); margin-top: 44px; }
+      .demo-card {
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+      }
+      .demo-card h2 { min-height: 0; margin-bottom: 25px; color: var(--text); font-size: 11px; letter-spacing: .1em; }
+      .demo-card label { margin: 17px 0 7px; padding: 0; border: 0; color: var(--muted); }
+      .demo-card select, .demo-card input:not([type="range"]) { border: 0; background: var(--control); }
+      .demo-card input[type="range"] { height: 32px; cursor: ew-resize; touch-action: pan-y; }
+      .demo-card input[type="range"]::-webkit-slider-thumb { width: 18px; height: 18px; border: 0; border-radius: 0; background: var(--accent); }
+      .demo-card input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 0; background: var(--accent); }
+      .demo-card input[type="range"]::-webkit-slider-runnable-track { height: 3px; }
+      .demo-card input[type="range"]::-moz-range-track { height: 3px; }
+      .demo-card button:not(.track-button) { border-color: #aaa79d; background: transparent; }
+      .demo-card button:not(.track-button):hover:not(:disabled) { border-color: var(--text); background: var(--text); color: var(--page); }
+      .demo-card details { margin-top: 18px; padding: 0; border: 0; }
+      #eventLog { padding: 0; border: 0; }
+      .demo-card .drum-step[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); }
+      .drum-hardware-step { cursor: pointer; }
+      .drum-hardware-step .step-hit {
+        fill: #e1e2e0;
+        stroke: #7b8081;
+        stroke-width: 1.5;
+        transition: fill 100ms ease, stroke 100ms ease, transform 80ms ease;
+      }
+      .drum-hardware-step .step-indicator { fill: #626769; pointer-events: none; }
+      .drum-hardware-step:hover .step-hit { fill: #f4c1aa; stroke: var(--accent); }
+      .drum-hardware-step:active .step-hit { transform: translateY(1px); }
+      .drum-hardware-step[aria-pressed="true"] .step-hit { fill: var(--accent); stroke: var(--accent); }
+      .drum-hardware-step[aria-pressed="true"] .step-indicator { fill: #fff8ef; }
+      .drum-hardware-step[aria-disabled="true"] { opacity: .42; cursor: default; }
+      .drum-hardware-step:focus-visible .step-hit { stroke: var(--accent); stroke-width: 3; }
+      .synth-hardware-key { cursor: pointer; outline: none; touch-action: manipulation; }
+      .synth-hardware-key .key-face { fill: #e1e2e0; stroke: #7b8081; stroke-width: 1.5; transition: fill 100ms ease, stroke 100ms ease, transform 80ms ease; }
+      .synth-hardware-key .key-mark { fill: #626769; pointer-events: none; }
+      .synth-hardware-key:hover .key-face { fill: #f4c1aa; stroke: var(--accent); }
+      .synth-hardware-key:active .key-face, .synth-hardware-key.pressed .key-face { fill: var(--accent); stroke: var(--accent); transform: translateY(1px); }
+      .synth-hardware-key:active .key-mark, .synth-hardware-key.pressed .key-mark { fill: #fff8ef; }
+      .synth-hardware-key:focus-visible .key-face { stroke: var(--accent); stroke-width: 3; }
+      .record-hardware-key { cursor: pointer; outline: none; touch-action: manipulation; }
+      .record-hardware-key .key-face { fill: #e1e2e0; stroke: #7b8081; stroke-width: 1.5; transition: fill 100ms ease, stroke 100ms ease, transform 80ms ease; }
+      .record-hardware-key .key-mark { fill: #626769; pointer-events: none; }
+      .record-hardware-key:active .key-face, .record-hardware-key.pressed .key-face { fill: #f4c1aa; stroke: var(--accent); transform: translateY(1px); }
+      .record-hardware-key[aria-pressed="true"] .key-face { fill: #ce4939; stroke: #a83227; }
+      .record-hardware-key[aria-pressed="true"] .key-mark { fill: #fff8ef; }
+      .record-hardware-key:focus-visible .key-face { stroke: var(--accent); stroke-width: 3; }
+      .note-key:active, .note-key[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
+      :root[data-theme="light"] .note-key:active, :root[data-theme="light"] .note-key[aria-pressed="true"] { color: #fff; }
+      @media (max-width: 780px) {
+        .page { padding: 20px 18px 64px; }
+        header { flex-direction: column; gap: 16px; margin-bottom: 0; }
+        .header-tools { align-self: flex-end; order: -1; }
+        .header-tools nav { gap: 12px; }
+        .header-tools nav a { font-size: 8px; }
+        .header-tools button { font-size: 8px; }
+        h1 { font-size: clamp(42px, 9vw, 68px); }
+        .page h1 > span { display: block; margin: .28em 0 0; font-size: .38em; vertical-align: baseline; }
+        .subtitle { max-width: 38em; margin-top: 16px; }
+        .scene { display: flex; min-height: 0; flex-direction: column; gap: 26px; padding: 34px 0 0; overflow: visible; }
+        .display-unit { position: relative; top: auto; left: auto; width: min(82%, 360px); align-self: flex-start; }
+        .device-wrap { width: 100%; margin: 0; overflow-x: auto; }
+        .device-caption { justify-content: space-between; }
+        .device-svg { min-width: 760px; }
+        .fx-unit-readout { gap: 5px 20px; }
+        .project-statement { grid-template-columns: 1fr; gap: 14px; margin-top: 54px; padding: 0; }
+        .project-statement h2 { font-size: 21px; }
+        .statement-copy { font-size: 13px; }
+        .controls { grid-template-columns: 1fr; gap: 26px; padding: 44px 0 34px; }
+        .controls > div:nth-child(-n+2) { padding: 0; border: 0; }
+        .demo-suite { grid-template-columns: 1fr; gap: 42px; margin-top: 38px; }
+      }
+      @media (max-width: 420px) {
+        h1 { font-size: clamp(40px, 10vw, 48px); }
+        .page h1 > span { font-size: .36em; }
+        .display-unit { width: 90%; }
+      }
+    </style>
   </head>
   <body>
-    <header class="page-header">
-      <div class="header-main">
-        <h1>SEQTRAK / FIELD DISPLAY <span>v1.3.7 · 4× HI-DPI · FIXED FONT</span></h1>
-        <p data-i18n="subtitle">A Mac browser prototype for automatically displaying sound names and parameters received from SEQTRAK. The display on the left is a preview only; it does not connect to BLE MIDI or hardware.</p>
-      </div>
-      <div class="header-tools">
-        <label for="language"><span data-i18n="language">Display language</span>
-          <select id="language" aria-label="Display language" data-i18n-attr="aria-label:language">
-            <option value="en">English</option>
-            <option value="ja">日本語</option>
-          </select>
-        </label>
-        <button id="themeToggle" type="button">Switch to light mode</button>
-      </div>
-    </header>
+    <div class="page">
+      <header>
+        <div>
+          <p class="eyebrow">A COMPANION DISPLAY FOR MUSIC IN MOTION</p>
+          <h1>SEQTRAK <span>FIELD DISPLAY</span></h1>
+        </div>
+        <div class="header-tools">
+          <nav aria-label="Page sections">
+            <a href="#hardware-view">Overview</a>
+            <a href="#preview-controls">Simulator</a>
+            <a href="#sound-design">Sound + FX</a>
+          </nav>
+          <button id="themeToggle" type="button" aria-label="Switch to dark mode" aria-pressed="true">Switch to dark mode</button>
+        </div>
+        <p class="header-summary">Sound, sequence, and performance state at a glance, so you can stay focused on the instrument.</p>
+      </header>
 
-    <div class="layout">
       <main>
-        <div class="preview-controls" aria-label="Preview size" data-i18n-attr="aria-label:previewControls">
-          <button id="actual" type="button" data-i18n="actualSize">Actual size · 320 px</button>
-          <button id="zoom" class="active" type="button" data-i18n="zoomPreview">Zoom preview</button>
-          <span id="sizeNote" class="preview-note" data-i18n="zoomed">Zoomed preview</span>
-        </div>
-        <div id="hardware" class="hardware">
-          <div class="screen">
-            <canvas id="display" width="1280" height="680" aria-label="SEQTRAK external display, 320 by 170 pixels" data-i18n-attr="aria-label:screenAria"></canvas>
+        <section id="hardware-view" class="scene" aria-label="SEQTRAK and external display front view">
+          <div class="display-unit">
+            <div class="unit-label"><span>FIELD DISPLAY</span><span>320 × 170</span></div>
+            <div class="bezel">
+              <div class="screen"><canvas id="display" width="1280" height="680" aria-label="320 by 170 display preview"></canvas></div>
+              <div class="bezel-mark"><span>SEQTRAK</span><span>FIELD / 01</span></div>
+            </div>
           </div>
-        </div>
-        <p class="preview-note detail-note" data-i18n="detailNote">The canvas is 1280 × 680 px and represents a 320 × 170 px display. Instrument shapes and lines illustrate categories and parameters; they are not audio waveforms. Actual size uses 320 × 170 CSS pixels.</p>
-      </main>
 
-      <aside class="panel controls-scroll" tabindex="0" aria-label="Mac preview controls" data-i18n-attr="aria-label:panelAria">
-        <section>
-          <h2 data-i18n="familyDemo">DISPLAY FAMILY / DEMO</h2>
-          <div id="tracks" class="tracks"></div>
-          <label for="preset"><span data-i18n="soundPreset">SOUND PRESET</span><output id="count"></output></label>
-          <select id="preset"></select>
-          <p class="help" data-i18n="soundPreviewHelp">Family and preset selection are for preview only. MIDI CC does not identify preset names, so names are shown only when available.</p>
-
-          <label for="cutoff"><span data-i18n="cutoff">FILTER CUTOFF</span><output id="cutoffVal">74</output></label>
-          <input id="cutoff" type="range" min="0" max="127" value="74">
-          <label for="resonance"><span data-i18n="resonance">FILTER RESONANCE</span><output id="resonanceVal">35</output></label>
-          <input id="resonance" type="range" min="0" max="127" value="35">
-          <label for="decay"><span data-i18n="decayRelease">DECAY / RELEASE</span><output id="decayVal">55</output></label>
-          <input id="decay" type="range" min="0" max="127" value="55">
-          <div class="actions">
-            <button id="play" type="button" data-i18n="play">▶ PLAY</button>
-            <button id="next" type="button" data-i18n="nextSound">NEXT SOUND →</button>
+          <div class="device-wrap">
+            <svg class="device-svg" viewBox="0 0 1400 410" role="img" aria-label="Monochrome front schematic of the SEQTRAK. Drum section pads are sequence controls; the Record key and Synth performance keys are interactive previews.">
+              <defs>
+                <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f7f5"/><stop offset="1" stop-color="#c9cccd"/></linearGradient>
+                <linearGradient id="knob" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#aeb2b4"/></linearGradient>
+                <pattern id="micGrid" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="3" fill="#898e90"/></pattern>
+              </defs>
+              <rect x="12" y="14" width="1376" height="382" rx="17" fill="#070809" opacity=".38"/>
+              <rect x="8" y="8" width="1376" height="382" rx="17" fill="url(#body)" stroke="#111416" stroke-width="3"/>
+              <rect x="22" y="23" width="42" height="350" rx="5" fill="#d4d6d7" stroke="#686d70"/>
+              <g fill="#24282a" font-family="IBM Plex Mono, monospace" font-size="8" text-anchor="middle">
+                <text transform="translate(43 58) rotate(-90)">VOL +</text><text transform="translate(43 92) rotate(-90)">VOL -</text>
+                <text transform="translate(43 132) rotate(-90)">DELETE</text><text transform="translate(43 172) rotate(-90)">MUTE</text>
+                <text transform="translate(43 212) rotate(-90)">SOLO</text><text transform="translate(43 252) rotate(-90)">PAGE</text>
+                <text transform="translate(43 294) rotate(-90)">PLAY</text>
+              </g>
+              <rect x="70" y="23" width="470" height="210" rx="5" fill="#eceeed" stroke="#8b9092"/>
+              <rect x="548" y="23" width="218" height="210" rx="5" fill="#e4e6e5" stroke="#8b9092"/>
+              <g fill="#262a2c" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle">
+                <text x="305" y="37">DRUM SECTION</text>
+                <text x="570" y="36">BAR LEN</text><text x="613" y="36">OCT</text><text x="657" y="36">SCALE</text><text x="701" y="36">KEY</text><text x="746" y="36">REC SMP</text>
+                <text x="124" y="54">ALL</text><text x="247" y="54">KICK</text><text x="370" y="54">SNARE</text><text x="493" y="54">CLAP</text>
+                <text x="124" y="219">HAT 1</text><text x="247" y="219">HAT 2</text><text x="370" y="219">PERC 1</text><text x="493" y="219">PERC 2</text>
+                <text x="605" y="54">SYNTH 1</text><text x="711" y="54">SYNTH 2</text><text x="605" y="219">DX</text><text x="711" y="219">SAMPLER</text>
+              </g>
+              <g class="track-knob all-knob" data-channel="all" tabindex="0" role="button" aria-label="ALL knob, rotate to change all patterns" aria-pressed="false">
+                <circle class="select-ring" cx="124" cy="95" r="30"/><circle class="knob-shell" cx="124" cy="95" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="124" cy="95" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M124 76v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="1" tabindex="0" role="button" aria-label="KICK track knob" aria-pressed="false">
+                <circle class="select-ring" cx="247" cy="95" r="30"/><circle class="knob-shell" cx="247" cy="95" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="247" cy="95" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M247 76v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="2" tabindex="0" role="button" aria-label="SNARE track knob" aria-pressed="false">
+                <circle class="select-ring" cx="370" cy="95" r="30"/><circle class="knob-shell" cx="370" cy="95" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="370" cy="95" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M370 76v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="3" tabindex="0" role="button" aria-label="CLAP track knob" aria-pressed="false">
+                <circle class="select-ring" cx="493" cy="95" r="30"/><circle class="knob-shell" cx="493" cy="95" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="493" cy="95" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M493 76v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="8" tabindex="0" role="button" aria-label="SYNTH 1 track knob" aria-pressed="false">
+                <circle class="select-ring" cx="605" cy="95" r="30"/><circle class="knob-shell" cx="605" cy="95" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="605" cy="95" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M605 76v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="9" tabindex="0" role="button" aria-label="SYNTH 2 track knob" aria-pressed="false">
+                <circle class="select-ring" cx="711" cy="95" r="30"/><circle class="knob-shell" cx="711" cy="95" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="711" cy="95" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M711 76v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="4" tabindex="0" role="button" aria-label="HAT 1 track knob" aria-pressed="false">
+                <circle class="select-ring" cx="124" cy="172" r="30"/><circle class="knob-shell" cx="124" cy="172" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="124" cy="172" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M124 153v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="5" tabindex="0" role="button" aria-label="HAT 2 track knob" aria-pressed="false">
+                <circle class="select-ring" cx="247" cy="172" r="30"/><circle class="knob-shell" cx="247" cy="172" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="247" cy="172" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M247 153v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="6" tabindex="0" role="button" aria-label="PERC 1 track knob" aria-pressed="false">
+                <circle class="select-ring" cx="370" cy="172" r="30"/><circle class="knob-shell" cx="370" cy="172" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="370" cy="172" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M370 153v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="7" tabindex="0" role="button" aria-label="PERC 2 track knob" aria-pressed="false">
+                <circle class="select-ring" cx="493" cy="172" r="30"/><circle class="knob-shell" cx="493" cy="172" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="493" cy="172" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M493 153v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="10" tabindex="0" role="button" aria-label="DX track knob" aria-pressed="false">
+                <circle class="select-ring" cx="605" cy="172" r="30"/><circle class="knob-shell" cx="605" cy="172" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="605" cy="172" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M605 153v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="track-knob" data-channel="11" tabindex="0" role="button" aria-label="SAMPLER track knob" aria-pressed="false">
+                <circle class="select-ring" cx="711" cy="172" r="30"/><circle class="knob-shell" cx="711" cy="172" r="26" fill="#d6d8d8" stroke="#5d6264" stroke-width="1.5"/><circle class="knob-cap" cx="711" cy="172" r="20" fill="url(#knob)" stroke="#5d6264" stroke-width="2"/><path d="M711 153v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g fill="#dedfdf" stroke="#777d80" stroke-width="1.4">
+                <rect x="70" y="242" width="470" height="62" rx="4"/><rect x="70" y="309" width="470" height="62" rx="4"/>
+                <rect x="548" y="242" width="218" height="62" rx="4"/><rect x="548" y="309" width="218" height="62" rx="4"/>
+              </g>
+              <g id="drumHardwareSteps" aria-label="Toggle the 16 preview drum sequence steps"></g>
+              <g id="recordHardwareKey" aria-label="Toggle the preview recording state"></g>
+              <g id="synthHardwareKeys" aria-label="Seven simulated Synth performance keys"></g>
+              <rect x="778" y="23" width="269" height="350" rx="5" fill="#d7d9d9" stroke="#777d80"/>
+              <rect x="1047" y="23" width="260" height="205" rx="5" fill="#d7d9d9" stroke="#777d80"/>
+              <g fill="#d1d3d3" stroke="#8a8f91" stroke-width="1">
+                <rect x="987" y="235" width="60" height="138"/>
+                <rect x="1047" y="235" width="130" height="138"/>
+                <rect x="1177" y="235" width="130" height="138"/>
+              </g>
+              <rect x="1058" y="34" width="238" height="184" fill="url(#micGrid)"/>
+              <g fill="#303436">
+                <circle cx="1246" cy="49" r="4"/><circle cx="1264" cy="49" r="4"/><circle cx="1246" cy="67" r="4"/><circle cx="1264" cy="67" r="4"/>
+                <circle cx="1150" cy="130" r="4"/><circle cx="1168" cy="130" r="4"/><circle cx="1186" cy="130" r="4"/><circle cx="1204" cy="130" r="4"/>
+                <circle cx="1132" cy="148" r="4"/><circle cx="1150" cy="148" r="4"/><circle cx="1168" cy="148" r="4"/><circle cx="1186" cy="148" r="4"/><circle cx="1204" cy="148" r="4"/><circle cx="1222" cy="148" r="4"/>
+                <circle cx="1132" cy="166" r="4"/><circle cx="1150" cy="166" r="4"/><circle cx="1168" cy="166" r="4"/><circle cx="1186" cy="166" r="4"/><circle cx="1204" cy="166" r="4"/><circle cx="1222" cy="166" r="4"/>
+                <circle cx="1150" cy="184" r="4"/><circle cx="1168" cy="184" r="4"/><circle cx="1186" cy="184" r="4"/><circle cx="1204" cy="184" r="4"/>
+              </g>
+              <rect x="1307" y="23" width="69" height="350" rx="4" fill="#d1d3d3" stroke="#777d80"/>
+              <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="6.5" text-anchor="middle">
+                <text transform="translate(1341 48) rotate(90)">USB</text><text transform="translate(1341 84) rotate(90)">PHONES</text>
+                <text transform="translate(1341 120) rotate(90)">AUDIO IN</text><text transform="translate(1341 156) rotate(90)">MIDI</text>
+                <text transform="translate(1341 192) rotate(90)">VOL +</text><text transform="translate(1341 228) rotate(90)">VOL −</text>
+                <text transform="translate(1341 264) rotate(90)">BPM</text><text transform="translate(1341 300) rotate(90)">SWING</text>
+                <text transform="translate(1341 336) rotate(90)">PROJECT</text>
+              </g>
+              <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="7.5">
+                <text x="793" y="43">SOUND</text><text x="793" y="59">PITCH</text><text x="793" y="75">MONO/POLY</text><text x="793" y="91">CHORD</text>
+                <text x="793" y="107">PAN</text><text x="793" y="123">VOLUME</text><text x="793" y="139">ATTACK</text><text x="793" y="155">DECAY</text>
+                <text x="793" y="171">MICRO TIMING</text><text x="793" y="187">FILTER</text><text x="793" y="203">RESONANCE</text><text x="793" y="219">REVERB</text>
+                <text x="793" y="235">DELAY</text><text x="793" y="251">COMP</text><text x="793" y="267">DISTORTION</text><text x="793" y="283">MODULATION</text>
+                <text x="793" y="299">DUCKER</text><text x="793" y="315">OTHER</text><text x="793" y="331">MIXER</text><text x="793" y="347">SONG</text>
+              </g>
+              <g fill="#555b5e">
+                <circle cx="854" cy="40" r="2.1"/><circle cx="854" cy="56" r="2.1"/><circle cx="854" cy="72" r="2.1"/><circle cx="854" cy="88" r="2.1"/>
+                <circle cx="854" cy="104" r="2.1"/><circle cx="854" cy="120" r="2.1"/><circle cx="854" cy="136" r="2.1"/><circle cx="854" cy="152" r="2.1"/>
+                <circle cx="854" cy="168" r="2.1"/><circle cx="854" cy="184" r="2.1"/><circle cx="854" cy="200" r="2.1"/><circle cx="854" cy="216" r="2.1"/>
+                <circle cx="854" cy="232" r="2.1"/><circle cx="854" cy="248" r="2.1"/><circle cx="854" cy="264" r="2.1"/><circle cx="854" cy="280" r="2.1"/>
+                <circle cx="854" cy="296" r="2.1"/><circle cx="854" cy="312" r="2.1"/>
+              </g>
+              <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="6">
+                <text x="1017" y="43" text-anchor="middle">FX</text>
+                <text x="895" y="344" text-anchor="middle">PAGE / PARAMETER</text><text x="1017" y="198" text-anchor="middle">MASTER / SINGLE</text>
+                <text id="fxStripLabelLevel" x="1017" y="248" text-anchor="middle">FX LEVEL</text><text id="fxStripLabelHighPass" x="1112" y="248" text-anchor="middle">HIGH PASS</text><text id="fxStripLabelRepeater" x="1242" y="248" text-anchor="middle">REPEATER</text>
+                <text x="1177" y="43" text-anchor="middle">MIC</text>
+              </g>
+              <g class="sound-knob" data-sound-knob="1" tabindex="0" role="button" aria-label="Sound Design knob 1, change the selected track sound">
+                <circle cx="895" cy="75" r="25" fill="#d6d8d8" stroke="#565c5f" stroke-width="1.5"/><circle cx="895" cy="75" r="19" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/><path d="M895 57v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g fill="url(#knob)" stroke="#565c5f" stroke-width="2">
+                <circle cx="895" cy="132" r="19"/><circle cx="895" cy="189" r="19"/><circle cx="895" cy="246" r="19"/>
+              </g>
+              <g id="fxKnob" class="fx-rotary" tabindex="0" role="button" aria-label="FX knob. Rotate to select one of the documented SEQTRAK effect presets.">
+                <circle cx="1017" cy="82" r="23" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/>
+                <path id="fxKnobIndicator" d="M1017 62v9" stroke="#596064" stroke-width="2.5" stroke-linecap="round"/>
+              </g>
+              <g id="fxModeControl" class="fx-mode-control" tabindex="0" role="switch" aria-label="MASTER/SINGLE effect target" aria-checked="false">
+                <rect class="fx-mode-track" x="987" y="169" width="60" height="11" rx="5.5" fill="#9da2a4" stroke="#555b5d"/>
+                <circle id="fxModeThumb" cx="1033" cy="174.5" r="4.5" fill="#f4f4f2" stroke="#555b5d"/>
+              </g>
+              <g stroke="#73797b" stroke-width="2" stroke-linecap="round">
+                <path d="M1000 264h34 M1000 276h34 M1000 288h34 M1000 300h34 M1000 312h34 M1000 324h34 M1000 336h34 M1000 348h34"/>
+                <path d="M1080 264h64 M1080 276h64 M1080 288h64 M1080 300h64 M1080 312h64 M1080 324h64 M1080 336h64 M1080 348h64"/>
+                <path d="M1210 264h64 M1210 276h64 M1210 288h64 M1210 300h64 M1210 312h64 M1210 324h64 M1210 336h64 M1210 348h64"/>
+              </g>
+              <g id="fxStripLevel" class="fx-touch-strip" data-strip="fxLevel" tabindex="0" role="slider" aria-orientation="vertical" aria-label="FX Level touch strip" aria-valuemin="0" aria-valuemax="127" aria-valuenow="64">
+                <rect class="fx-strip-hit" x="989" y="258" width="56" height="105" rx="2"/>
+                <circle class="fx-touch-indicator" cx="1017" cy="310" r="4"/>
+              </g>
+              <g id="fxStripHighPass" class="fx-touch-strip" data-strip="highPass" tabindex="0" role="slider" aria-orientation="vertical" aria-label="High Pass touch strip" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0">
+                <rect class="fx-strip-hit" x="1049" y="258" width="126" height="105" rx="2"/>
+                <circle class="fx-touch-indicator" cx="1112" cy="358" r="4"/>
+              </g>
+              <g id="fxStripRepeater" class="fx-touch-strip" data-strip="repeater" tabindex="0" role="slider" aria-orientation="vertical" aria-label="Repeater touch strip" aria-valuemin="0" aria-valuemax="127" aria-valuenow="0">
+                <rect class="fx-strip-hit" x="1179" y="258" width="126" height="105" rx="2"/>
+                <circle class="fx-touch-indicator" cx="1242" cy="358" r="4"/>
+              </g>
+            </svg>
+          </div>
+          <div class="fx-unit-readout" aria-live="polite">
+            <span id="fxUnitPresetReadout">FX UNIT · SINGLE · FILTER 1/8</span>
+            <span id="fxUnitPageReadout">PAGE 1 · EFFECT PARAMETER 1 / HIGH PASS CUTOFF / BEAT REPEAT LENGTH</span>
+            <button id="fxPageControl" class="fx-page-control" type="button" aria-label="Simulator FX Page control. Press to switch between page 1 and page 2." aria-pressed="false">SIM PAGE 1</button>
           </div>
         </section>
 
-        <section class="section-divider">
-          <h2 data-i18n="effectDemo">EFFECT DISPLAY / DEMO</h2>
-          <label for="fxScope"><span data-i18n="effectSlot">EFFECT SLOT</span></label>
-          <select id="fxScope">
-            <option value="Single" data-i18n="singleEffect">SINGLE EFFECT</option>
-            <option value="Send" data-i18n="sendEffect">SEND EFFECT</option>
-            <option value="Master 1" data-i18n="masterEffect1">MASTER EFFECT 1</option>
-            <option value="Master 2" data-i18n="masterEffect2">MASTER EFFECT 2</option>
-            <option value="Master 3" data-i18n="masterEffect3">MASTER EFFECT 3</option>
-          </select>
-          <label for="fxCategory"><span data-i18n="effectCategory">EFFECT CATEGORY</span></label>
-          <select id="fxCategory"></select>
-          <label for="fxType"><span data-i18n="effectType">EFFECT TYPE</span></label>
-          <select id="fxType"></select>
-          <label for="fxParameter"><span data-i18n="fxParameter">FX PARAMETER</span></label>
-          <select id="fxParameter"></select>
-          <label for="fxParamValue"><span data-i18n="value">VALUE</span><output id="fxParamValueLabel">—</output></label>
-          <input id="fxParamValue" type="range" min="0" max="127" value="64">
-          <p id="fxParamMeta" class="help"></p>
-          <label for="fxVisualIntensity"><span data-i18n="illustrativeIntensity">ILLUSTRATIVE INTENSITY / DEMO ONLY</span><output id="fxVisualIntensityVal">65</output></label>
-          <input id="fxVisualIntensity" type="range" min="0" max="127" value="65">
-          <div class="actions fx-level-tests">
-            <button type="button" class="fx-test" data-level="0" data-i18n="min">MIN</button>
-            <button type="button" class="fx-test" data-level="0.5" data-i18n="mid">MID</button>
-            <button type="button" class="fx-test" data-level="1" data-i18n="max">MAX</button>
+        <section id="preview-controls" class="controls" aria-label="Preview controls">
+          <div>
+            <label class="field-label" for="trackList">PREVIEW TRACK · 11 MIDI CHANNELS</label>
+            <div id="trackList" class="track-list"></div>
           </div>
-          <p id="fxVisualHint" class="help"></p>
+          <div class="type-control">
+            <label class="field-label" for="trackType">TRACK TYPE · OS V2.00 DEMO</label>
+            <select id="trackType"></select>
+          </div>
+          <div class="record-control">
+            <span class="field-label">RECORDING STATE · DEMO</span>
+            <button id="recordToggle" class="record-toggle" type="button" aria-pressed="false">REC OFF</button>
+          </div>
+          <div class="key-control">
+            <span class="field-label">MIDI NOTE INPUT · SIMULATED EVENT (60–71)</span>
+            <div id="noteKeys" class="note-keys" aria-label="Hold a simulated MIDI note event to preview its pitch class"></div>
+          </div>
+          <div id="stateReadout" class="state-readout" aria-live="polite"></div>
         </section>
+        <section id="sound-design" class="demo-suite" aria-label="Sound, effects, and MIDI parameter demos">
+          <section class="demo-card">
+            <h2>DISPLAY FAMILY / SOUND DEMO</h2>
+            <div id="tracks" class="track-list" aria-label="Display family"></div>
+            <label for="preset"><span>SOUND PRESET</span><output id="count"></output></label>
+            <select id="preset"></select>
+            <p class="help">Sound family and preset selection are preview inputs. A MIDI CC event does not identify a preset name.</p>
+            <label for="cutoff"><span>FILTER CUTOFF</span><output id="cutoffVal">74</output></label>
+            <input id="cutoff" type="range" min="0" max="127" value="74">
+            <label for="resonance"><span>FILTER RESONANCE</span><output id="resonanceVal">35</output></label>
+            <input id="resonance" type="range" min="0" max="127" value="35">
+            <label for="decay"><span>DECAY / RELEASE</span><output id="decayVal">55</output></label>
+            <input id="decay" type="range" min="0" max="127" value="55">
+            <div id="drumSequenceControl">
+              <label><span>DRUM SEQUENCE · 16 STEPS · PREVIEW</span></label>
+              <div id="drumSteps" class="drum-steps" aria-label="Toggle simulated drum sequence steps"></div>
+              <p class="help">Toggle steps to preview a pattern. This does not read the SEQTRAK pattern.</p>
+            </div>
+            <div class="actions"><button id="play" type="button">▶ PLAY INDICATOR</button><button id="next" type="button">NEXT SOUND →</button></div>
+          </section>
 
-        <section class="section-divider">
-          <h2 data-i18n="midiTest">DOCUMENTED MIDI CC / EVENT TEST</h2>
-          <p class="help" data-i18n="midiHelp">This preview uses channels, CC numbers, and value ranges documented in the user guide. It does not connect to or send data to MIDI hardware.</p>
-          <label for="midiChannel"><span data-i18n="midiChannel">MIDI CHANNEL</span></label>
-          <select id="midiChannel"></select>
-          <label for="midiController"><span data-i18n="controlChange">CONTROL CHANGE</span></label>
-          <select id="midiController"></select>
-          <label for="midiValue"><span data-i18n="value">VALUE</span><output id="midiValueLabel">64</output></label>
-          <input id="midiValue" type="range" min="0" max="127" value="64">
-          <button id="applyMidiEvent" type="button" data-i18n="applyCc">Apply CC event to display</button>
-          <div class="performance-preview">
-            <h2 data-i18n="performanceDemo">PERFORMANCE INPUT / DEMO</h2>
-            <label for="bpmPreview"><span data-i18n="bpmPreview">BPM PREVIEW (5–300)</span></label>
-            <div class="inline-fields">
-              <input id="bpmPreview" type="number" min="5" max="300" step="any" inputmode="decimal">
-              <button id="setBpmPreview" type="button" data-i18n="setBpmPreview">SET PREVIEW BPM</button>
-            </div>
-            <div class="actions bpm-step-buttons">
-              <button id="bpmDownPreview" type="button" data-i18n="bpmDownDemo" disabled>−1 BPM</button>
-              <button id="bpmUpPreview" type="button" data-i18n="bpmUpDemo" disabled>+1 BPM</button>
-            </div>
-            <p class="help" data-i18n="bpmPreviewHelp">Preview only. This does not read from or send tempo to SEQTRAK.</p>
+          <section class="demo-card">
+            <h2>EFFECT DISPLAY / DEMO</h2>
+            <label for="fxScope"><span>EFFECT SLOT</span></label>
+            <select id="fxScope">
+              <option value="Single">SINGLE EFFECT</option><option value="Send">SEND EFFECT</option>
+              <option value="Master 1">MASTER EFFECT 1</option><option value="Master 2">MASTER EFFECT 2</option><option value="Master 3">MASTER EFFECT 3</option>
+            </select>
+            <label for="fxCategory"><span>EFFECT CATEGORY</span></label><select id="fxCategory"></select>
+            <label for="fxType"><span>EFFECT TYPE</span></label><select id="fxType"></select>
+            <label for="fxParameter"><span>FX PARAMETER</span></label><select id="fxParameter"></select>
+            <label for="fxParamValue"><span>PARAMETER VALUE</span><output id="fxParamValueLabel">—</output></label>
+            <input id="fxParamValue" type="range" min="0" max="127" value="64">
+            <p id="fxParamMeta" class="help">Parameter range will be shown when documented.</p>
+            <label for="fxVisualIntensity"><span>ILLUSTRATIVE INTENSITY · DEMO ONLY</span><output id="fxVisualIntensityVal">65</output></label>
+            <input id="fxVisualIntensity" type="range" min="0" max="127" value="65">
+            <div class="actions fx-level-tests"><button class="fx-test" type="button" data-level="0">MIN</button><button class="fx-test" type="button" data-level="0.5">MID</button><button class="fx-test" type="button" data-level="1">MAX</button></div>
+            <p id="fxVisualHint" class="help"></p>
+            <details>
+              <summary>v1.3.4 LEGACY FX ADDRESS DEMO</summary>
+              <p class="help">This legacy address mapping is unverified against the supplied guide and has not been tested on hardware. It is not a connection protocol.</p>
+              <label for="sysexAddress"><span>PARAMETER ADDRESS · 3 BYTES</span></label><input id="sysexAddress" value="30 43 00" spellcheck="false">
+              <label for="sysexValue"><span>EFFECT TYPE · MSB / LSB</span></label><input id="sysexValue" value="01 02" spellcheck="false">
+              <div class="actions"><button id="applyFxEvent" type="button">TRY LEGACY EVENT</button><button id="demoFxSequence" type="button">LEGACY DEMO</button></div>
+            </details>
+          </section>
+
+          <section class="demo-card">
+            <h2>DOCUMENTED MIDI CC / PERFORMANCE DEMO</h2>
+            <p class="help">The event controls use documented channels, CC numbers, and ranges. Track Volume CC 7 is separate from the side VOL + / VOL − controls. MUTE / SOLO CCs do not report physical button presses. This page does not connect to or send data to MIDI hardware.</p>
+            <label for="midiChannel"><span>MIDI CHANNEL</span></label><select id="midiChannel"></select>
+            <label for="midiController"><span>CONTROL CHANGE</span></label><select id="midiController"></select>
+            <label for="midiValue"><span>VALUE</span><output id="midiValueLabel">64</output></label><input id="midiValue" type="range" min="0" max="127" value="64">
+            <button id="applyMidiEvent" type="button">APPLY CC EVENT TO DISPLAY</button>
+            <h2 style="margin-top:20px">PERFORMANCE INPUT / DEMO</h2>
+            <label for="bpmPreview"><span>BPM PREVIEW · 5–300</span></label>
+            <div class="inline-fields"><input id="bpmPreview" type="number" min="5" max="300" step="any" inputmode="decimal"><button id="setBpmPreview" type="button">SET PREVIEW BPM</button></div>
+            <div class="actions bpm-step-buttons"><button id="bpmDownPreview" type="button" disabled>−1 BPM</button><button id="bpmUpPreview" type="button" disabled>+1 BPM</button></div>
+            <p class="help">Preview only. Tempo is not read from or sent to SEQTRAK.</p>
             <div class="note-preview-fields">
-              <div>
-                <label for="noteNumber"><span data-i18n="noteNumber">MIDI NOTE NUMBER (0–127)</span></label>
-                <input id="noteNumber" type="number" min="0" max="127" value="60">
-              </div>
-              <div>
-                <label for="noteVelocity"><span data-i18n="velocity">VELOCITY (0–127)</span></label>
-                <input id="noteVelocity" type="number" min="0" max="127" value="96">
-              </div>
+              <div><label for="noteNumber"><span>MIDI NOTE · 0–127</span></label><input id="noteNumber" type="number" min="0" max="127" value="60"></div>
+              <div><label for="noteVelocity"><span>VELOCITY · 0–127</span></label><input id="noteVelocity" type="number" min="0" max="127" value="96"></div>
             </div>
-            <div class="actions note-preview-actions">
-              <button id="noteOnPreview" type="button" data-i18n="noteOn">NOTE ON</button>
-              <button id="noteOffPreview" type="button" data-i18n="noteOff">NOTE OFF</button>
-            </div>
-            <p class="help" data-i18n="notePreviewHelp">Plots recent MIDI note events only; it does not read a saved pattern.</p>
-          </div>
-          <details class="legacy-panel">
-            <summary data-i18n="legacySummary">v1.3.4 FX address input test</summary>
-            <p class="help" data-i18n="legacyHelp">This address format and mapping are not confirmed in the supplied user guide and have not been tested on hardware. Retained as a legacy demo only; it is not a connection protocol.</p>
-            <label for="sysexAddress"><span data-i18n="parameterAddress">PARAMETER ADDRESS (3 bytes)</span></label>
-            <input id="sysexAddress" value="30 43 00" spellcheck="false">
-            <label for="sysexValue"><span data-i18n="effectTypeMsb">EFFECT TYPE MSB / LSB</span></label>
-            <input id="sysexValue" value="01 02" spellcheck="false">
-            <div class="actions">
-              <button id="applyFxEvent" type="button" data-i18n="tryLegacy">Try legacy event</button>
-              <button id="demoFxSequence" type="button" data-i18n="legacyDemo">Legacy demo</button>
-            </div>
-          </details>
-          <pre id="eventLog" aria-live="polite">Ready. No hardware connected.</pre>
+            <div class="actions note-preview-actions"><button id="noteOnPreview" type="button">NOTE ON</button><button id="noteOffPreview" type="button">NOTE OFF</button></div>
+            <p class="help">Recent MIDI note events only. Saved sequences are not read.</p>
+            <pre id="eventLog" aria-live="polite">Ready. No hardware connected.</pre>
+          </section>
         </section>
-      </aside>
+        <section class="project-statement" aria-label="Project concept">
+          <div>
+            <p class="statement-kicker">AN INDEPENDENT VISUAL COMPANION</p>
+            <h2>Keep your hands on the instrument.</h2>
+          </div>
+          <div>
+            <p class="statement-copy">Made for sound design, sequencing, and live performance, SEQTRAK Field Display brings sound, sequence, and performance state into quick view as you create or play live. The original instrument remains at the center, represented by a monochrome schematic alongside a 320 × 170 pixel preview of the external display.</p>
+            <a class="statement-link" href="#preview-controls">EXPLORE THE SIMULATOR</a>
+          </div>
+        </section>
+        <p class="note">Drag or scroll the FX knob to cycle the documented 8-category effect presets. Click MASTER/SINGLE to change the target and use the simulator FX Page control below the hardware drawing to switch parameter assignments. Drag a touch strip to adjust its assigned value. On Page 1, HIGH PASS and REPEATER stay active only while pressed and bypass on release. Click the 16 Drum-section pads to toggle preview steps; they update the display and step grid below. These controls are simulations only and produce no audio or hardware connection. Drum-section pads are sequence controls; Synth-section keys perform notes. The sounding Synth note depends on the selected track and its Scale, Key, and Octave settings, so this page's C4–B4 buttons simulate MIDI note events and do not claim a physical-key mapping. REC and note controls are simulations only: this page does not connect to SEQTRAK or detect recording state. DrumKit uses a neutral symbol when its active sound is unknown.</p>
+      </main>
     </div>
+
+    <script>
+      window.addEventListener("DOMContentLoaded", function () {
+        const canvas = document.getElementById("display");
+        const ctx = canvas.getContext("2d");
+        const Model = window.SeqtrakDisplayState;
+        const Renderer = window.SeqtrakDisplayRenderer;
+        const catalog = window.SEQTRAK_CATALOG;
+        const FxModel = window.SeqtrakFxModel;
+        const FxUnit = window.SeqtrakFxUnit;
+        const fxSpecs = window.SEQTRAK_FX_SPECS;
+        const hardwareFxPresets = window.SEQTRAK_HARDWARE_FX_PRESETS;
+        const channelButtons = document.getElementById("trackList");
+        const typeSelect = document.getElementById("trackType");
+        const stateReadout = document.getElementById("stateReadout");
+        const themeToggle = document.getElementById("themeToggle");
+        const recordToggle = document.getElementById("recordToggle");
+        const noteKeys = document.getElementById("noteKeys");
+        const drumSequenceControl = document.getElementById("drumSequenceControl");
+        const drumSteps = document.getElementById("drumSteps");
+        const drumHardwareSteps = document.getElementById("drumHardwareSteps");
+        const recordHardwareKey = document.getElementById("recordHardwareKey");
+        const synthHardwareKeys = document.getElementById("synthHardwareKeys");
+        const familyButtons = document.getElementById("tracks");
+        const trackKnobs = Array.from(document.querySelectorAll(".track-knob"));
+        const soundKnobOne = document.querySelector(".sound-knob[data-sound-knob='1']");
+        const fxKnob = document.getElementById("fxKnob");
+        const fxModeControl = document.getElementById("fxModeControl");
+        const fxPageControl = document.getElementById("fxPageControl");
+        const fxStripControls = Array.from(document.querySelectorAll(".fx-touch-strip"));
+        const patterns = {};
+        const queuedPatterns = {};
+        const soundIndexes = {};
+        const drumSequences = {};
+        let theme = "light";
+        let channel = 1;
+        let trackType = "Drum";
+        let allPatternMode = false;
+        let familyOverride = null;
+        let recording = false;
+        let fxUnitMode = "Single";
+        let fxUnitPage = 1;
+        let hardwareFxPresetIndex = 0;
+        let state = Model.createInitialState();
+
+        ctx.setTransform(4, 0, 0, 4, 0, 0);
+
+        function typesForChannel(value) {
+          if (value <= 7) return ["Drum", "DrumKit", "Synth"];
+          if (value <= 9) return ["Synth"];
+          if (value === 10) return ["DX"];
+          return ["Sampler"];
+        }
+
+        function typeForChannel(value) {
+          return value <= 7 ? "Drum" : value <= 9 ? "Synth" : value === 10 ? "DX" : "Sampler";
+        }
+
+        function familyFor(track, type) {
+          if (type === "Drum") return track.family || null;
+          if (type === "Synth" || type === "DX") return "synth";
+          return null;
+        }
+
+        function updateTrackTypeOptions() {
+          const options = typesForChannel(channel);
+          if (!options.includes(trackType)) trackType = typeForChannel(channel);
+          typeSelect.replaceChildren();
+          options.forEach(function (name) {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            typeSelect.append(option);
+          });
+          typeSelect.value = trackType;
+        }
+
+        function activeFamilyId() {
+          return familyOverride || familyFor(Model.MIDI_TRACKS[channel], trackType);
+        }
+
+        function drumSequenceFor(targetChannel) {
+          const patternNumber = patterns[targetChannel] || 1;
+          if (!drumSequences[targetChannel]) drumSequences[targetChannel] = {};
+          if (!drumSequences[targetChannel][patternNumber]) {
+            drumSequences[targetChannel][patternNumber] = Array.from({ length: 16 }, function () { return false; });
+          }
+          return drumSequences[targetChannel][patternNumber];
+        }
+
+        function syncTrackSelection() {
+          trackKnobs.forEach(function (knob) {
+            const isAllKnob = knob.dataset.channel === "all";
+            const selected = isAllKnob ? allPatternMode : Number(knob.dataset.channel) === channel;
+            knob.classList.toggle("active", selected);
+            knob.setAttribute("aria-pressed", String(selected));
+            if (isAllKnob) {
+              knob.setAttribute("aria-label", allPatternMode
+                ? "ALL knob held. Tap Drum key 1 to 6 to queue a pattern for all tracks; double-tap to switch immediately."
+                : "ALL knob. Rotate to change patterns on all tracks. Press to choose a pattern for all tracks.");
+            }
+          });
+          channelButtons.querySelectorAll("button").forEach(function (button) {
+            button.classList.toggle("active", Number(button.dataset.channel) === channel);
+          });
+          familyButtons.querySelectorAll("button").forEach(function (button) {
+            button.classList.toggle("active", Boolean(state.track && state.track.id === button.dataset.id));
+          });
+        }
+
+        function setAllPatternMode(enabled) {
+          allPatternMode = Boolean(enabled);
+          syncTrackSelection();
+          syncHardwareDrumPads();
+          if (allPatternMode) {
+            stateReadout.textContent = "ALL KNOB HELD · DRUM KEYS 1–6: QUEUE / DOUBLE-TAP: SWITCH NOW";
+          } else {
+            refreshPreviewReadout();
+          }
+        }
+
+        function setAllTrackPattern(patternNumber, queued) {
+          Object.keys(Model.MIDI_TRACKS).forEach(function (key) {
+            const targetChannel = Number(key);
+            if (queued) queuedPatterns[targetChannel] = patternNumber;
+            else {
+              patterns[targetChannel] = patternNumber;
+              delete queuedPatterns[targetChannel];
+            }
+          });
+          if (!queued && channel <= 7 && trackType === "Drum") {
+            state.drumPattern = drumSequenceFor(channel).slice();
+            state.drumPatternNumber = patterns[channel];
+            syncDrumSteps();
+          }
+          refreshPreviewReadout();
+          stateReadout.textContent = "ALL TRACKS · PATTERN " + patternNumber + (queued ? " QUEUED" : " SELECTED");
+        }
+
+        function syncMidiChannelSelection() {
+          const select = document.getElementById("midiChannel");
+          if (select && Array.from(select.children).some(function (option) { return option.value === String(channel); })) {
+            select.value = String(channel);
+          }
+        }
+
+        function syncSoundControls() {
+          const presetSelect = document.getElementById("preset");
+          presetSelect.replaceChildren();
+          const choices = state.presets || [];
+          if (!choices.length) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "PRESET DATA UNAVAILABLE";
+            presetSelect.append(option);
+            presetSelect.disabled = true;
+          } else {
+            presetSelect.disabled = false;
+            choices.forEach(function (preset, index) {
+              const option = document.createElement("option");
+              option.value = String(index);
+              option.textContent = preset.name;
+              presetSelect.append(option);
+            });
+            presetSelect.value = String(Math.max(0, state.selectedIndex));
+          }
+          document.getElementById("count").textContent = choices.length ? choices.length + " sounds" : "0 sounds";
+        }
+
+        function syncParameterControls() {
+          ["cutoff", "resonance", "decay"].forEach(function (key) {
+            const input = document.getElementById(key);
+            const value = state.values[key];
+            input.value = String(value);
+            document.getElementById(key + "Val").textContent = String(value);
+          });
+        }
+
+        function refreshPreviewReadout() {
+          const deviceTrack = Model.MIDI_TRACKS[channel];
+          const currentPattern = patterns[channel] || 1;
+          const queuedPattern = queuedPatterns[channel];
+          stateReadout.textContent = "CH " + String(channel).padStart(2, "0") + " · " + deviceTrack.name + " · " + trackType.toUpperCase() + " · PATTERN " + currentPattern + (queuedPattern ? " → " + queuedPattern + " QUEUED" : "") + (recording ? " · REC" : "");
+          syncTrackSelection();
+        }
+
+        function syncPerformanceControls() {
+          const input = document.getElementById("bpmPreview");
+          input.value = state.bpm === null ? "" : String(state.bpm);
+          document.getElementById("bpmDownPreview").disabled = state.bpm === null || state.bpm <= 5;
+          document.getElementById("bpmUpPreview").disabled = state.bpm === null || state.bpm >= 300;
+          document.getElementById("play").textContent = state.playing ? "▶ PLAY INDICATOR" : "■ STOP INDICATOR";
+        }
+
+        function syncDrumSteps() {
+          const pattern = state.drumPattern;
+          drumSequenceControl.hidden = !Array.isArray(pattern);
+          drumSteps.replaceChildren();
+          if (!Array.isArray(pattern)) {
+            syncHardwareDrumPads();
+            return;
+          }
+          pattern.forEach(function (active, index) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "drum-step";
+            button.textContent = String(index + 1).padStart(2, "0");
+            button.setAttribute("aria-label", "Toggle preview step " + (index + 1));
+            button.setAttribute("aria-pressed", String(active));
+            button.addEventListener("click", function () {
+              toggleDrumStep(index);
+            });
+            drumSteps.append(button);
+          });
+          syncHardwareDrumPads();
+        }
+
+        function buildDrumHardwarePads() {
+          const svgNS = "http://www.w3.org/2000/svg";
+          const positions = [99, 158, 217, 276, 335, 394, 453, 512];
+          for (let index = 0; index < 16; index++) {
+            const row = index < 8 ? 0 : 1;
+            const column = index % 8;
+            const centerX = positions[column];
+            const centerY = row === 0 ? 273 : 340;
+            const group = document.createElementNS(svgNS, "g");
+            group.classList.add("drum-hardware-step");
+            group.dataset.stepIndex = String(index);
+            group.setAttribute("tabindex", "0");
+            group.setAttribute("role", "button");
+            group.setAttribute("aria-pressed", "false");
+            group.setAttribute("aria-disabled", "true");
+            group.setAttribute("aria-label", "Drum sequence step " + (index + 1));
+            const hit = document.createElementNS(svgNS, "rect");
+            hit.setAttribute("class", "step-hit");
+            hit.setAttribute("x", String(centerX - 26));
+            hit.setAttribute("y", String(centerY - 25));
+            hit.setAttribute("width", "52");
+            hit.setAttribute("height", "50");
+            hit.setAttribute("rx", "2");
+            const indicator = document.createElementNS(svgNS, "rect");
+            indicator.setAttribute("class", "step-indicator");
+            indicator.setAttribute("x", String(centerX - 10));
+            indicator.setAttribute("y", String(centerY - 2));
+            indicator.setAttribute("width", "20");
+            indicator.setAttribute("height", "4");
+            indicator.setAttribute("rx", "2");
+            group.append(hit, indicator);
+            group.addEventListener("click", function (event) {
+              if (allPatternMode) {
+                if (index < 6) setAllTrackPattern(index + 1, Number(event.detail) < 2);
+                return;
+              }
+              toggleDrumStep(index);
+            });
+            group.addEventListener("keydown", function (event) {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                if (allPatternMode) {
+                  if (index < 6) setAllTrackPattern(index + 1, true);
+                } else {
+                  toggleDrumStep(index);
+                }
+              }
+            });
+            drumHardwareSteps.append(group);
+          }
+          syncHardwareDrumPads();
+        }
+
+        function syncHardwareDrumPads() {
+          if (!drumHardwareSteps) return;
+          const pattern = state.drumPattern;
+          Array.from(drumHardwareSteps.children).forEach(function (pad, index) {
+            const stepModeEnabled = channel <= 7 && trackType === "Drum" && Array.isArray(pattern);
+            const patternModeEnabled = allPatternMode && index < 6;
+            const enabled = allPatternMode ? patternModeEnabled : stepModeEnabled;
+            pad.setAttribute("aria-disabled", String(!enabled));
+            pad.setAttribute("aria-pressed", String(Boolean(!allPatternMode && enabled && pattern[index])));
+            const label = allPatternMode
+              ? (index < 6 ? "Set pattern " + (index + 1) + " for all tracks" : "Pattern selection uses Drum keys 1 to 6")
+              : "Toggle drum sequence step " + (index + 1);
+            pad.setAttribute("aria-label", label + (enabled ? "" : " (not available in this mode)"));
+          });
+        }
+
+        function buildSynthHardwareKeys() {
+          const svgNS = "http://www.w3.org/2000/svg";
+          if (!recordHardwareKey || !synthHardwareKeys) return;
+          const positions = [576, 630, 684, 738];
+          for (let index = 0; index < 8; index++) {
+            const row = index < 4 ? 0 : 1;
+            const column = index % 4;
+            const centerX = positions[column];
+            const centerY = row === 0 ? 273 : 340;
+            const group = document.createElementNS(svgNS, "g");
+            const isRecordKey = index === 0;
+            const hardwareKeyIndex = isRecordKey ? null : index;
+            group.classList.add(isRecordKey ? "record-hardware-key" : "synth-hardware-key");
+            if (!isRecordKey) group.dataset.keyIndex = String(hardwareKeyIndex);
+            group.setAttribute("tabindex", "0");
+            group.setAttribute("role", "button");
+            if (isRecordKey) {
+              group.setAttribute("aria-pressed", String(recording));
+              group.setAttribute("aria-label", recording ? "Stop simulated recording" : "Start simulated recording");
+            } else {
+              group.setAttribute("aria-label", "Synth performance key " + hardwareKeyIndex + ". The selected sound plays; pitch depends on Scale, Key, and Octave.");
+            }
+            const face = document.createElementNS(svgNS, "rect");
+            face.setAttribute("class", "key-face");
+            face.setAttribute("x", String(centerX - 24));
+            face.setAttribute("y", String(centerY - 25));
+            face.setAttribute("width", "48");
+            face.setAttribute("height", "50");
+            face.setAttribute("rx", "2");
+            const mark = document.createElementNS(svgNS, "rect");
+            mark.setAttribute("class", "key-mark");
+            mark.setAttribute("x", String(centerX - 9));
+            mark.setAttribute("y", String(centerY - 2));
+            mark.setAttribute("width", "18");
+            mark.setAttribute("height", "4");
+            mark.setAttribute("rx", "2");
+            function releaseKey() { group.classList.remove("pressed"); }
+            group.append(face, mark);
+            group.addEventListener("pointerdown", function (event) {
+              event.preventDefault();
+              group.classList.add("pressed");
+            });
+            group.addEventListener("pointerup", releaseKey);
+            group.addEventListener("pointercancel", releaseKey);
+            group.addEventListener("pointerleave", releaseKey);
+            group.addEventListener("lostpointercapture", releaseKey);
+            group.addEventListener("keydown", function (event) {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                group.classList.add("pressed");
+                if (isRecordKey && !event.repeat) toggleRecordingPreview();
+              }
+            });
+            group.addEventListener("keyup", releaseKey);
+            group.addEventListener("blur", releaseKey);
+            if (isRecordKey) {
+              group.addEventListener("click", toggleRecordingPreview);
+              recordHardwareKey.append(group);
+            } else {
+              synthHardwareKeys.append(group);
+            }
+          }
+        }
+
+        function toggleDrumStep(index) {
+          if (channel > 7 || trackType !== "Drum") return;
+          const next = drumSequenceFor(channel).slice();
+          if (!Number.isInteger(index) || index < 0 || index >= next.length) return;
+          next[index] = !next[index];
+          drumSequences[channel][patterns[channel] || 1] = next;
+          state.drumPattern = next.slice();
+          state.drumPatternSource = "PREVIEW";
+          state.drumPatternNumber = patterns[channel] || 1;
+          state.view = "overview";
+          state.until = 0;
+          syncDrumSteps();
+          refreshPreviewReadout();
+        }
+
+        function syncPreviewControls() {
+          syncSoundControls();
+          syncParameterControls();
+          syncPerformanceControls();
+          syncDrumSteps();
+          refreshPreviewReadout();
+        }
+
+        function makeState() {
+          const previous = state || Model.createInitialState();
+          const deviceTrack = Model.MIDI_TRACKS[channel];
+          const familyId = activeFamilyId();
+          const family = familyId ? catalog.tracks.find(function (item) { return item.id === familyId; }) || null : null;
+          const displayName = deviceTrack.name + " / " + trackType.toUpperCase();
+          const choices = presetChoices();
+          const savedIndex = Math.max(0, Math.min((soundIndexes[channel] || 0), Math.max(0, choices.length - 1)));
+          const selectedSynthTrack = ((channel === 8 || channel === 9) && trackType === "Synth") || (channel === 10 && trackType === "DX");
+          const recentNotes = previous.noteEvents || [];
+          const heldSynthNote = recentNotes.slice().reverse().find(function (event) {
+            return event.channel >= 8 && event.channel <= 10 && event.endedAt === null;
+          });
+          state = Object.assign({}, Model.createInitialState(), {
+            language: "en",
+            theme: theme,
+            source: familyOverride ? "demo" : "midi",
+            deviceTrack: { name: displayName, channel: channel, family: familyId, type: trackType },
+            track: family,
+            presets: choices,
+            preset: choices[savedIndex] || null,
+            selectedIndex: choices.length ? savedIndex : -1,
+            values: Object.assign({}, previous.values),
+            bpm: previous.bpm,
+            bpmSource: previous.bpmSource,
+            bpmChange: previous.bpmChange,
+            playing: previous.playing,
+            noteEvents: recentNotes,
+            view: familyOverride ? "track" : "overview",
+            until: 0,
+            fx: previous.fx,
+            recording: recording,
+            drumPattern: trackType === "Drum" && channel <= 7 ? drumSequenceFor(channel).slice() : null,
+            drumPatternSource: trackType === "Drum" && channel <= 7 ? "PREVIEW" : null,
+            drumPatternNumber: patterns[channel] || 1,
+            activeNote: heldSynthNote ? heldSynthNote.note : selectedSynthTrack ? previous.activeNote : null
+          });
+          syncPreviewControls();
+        }
+
+        function chooseChannel(value) {
+          if (value !== channel) trackType = typeForChannel(value);
+          channel = value;
+          familyOverride = null;
+          updateTrackTypeOptions();
+          syncMidiChannelSelection();
+          makeState();
+        }
+
+        function stepPattern(target, direction, queued) {
+          const current = queued
+            ? (queuedPatterns[target] || patterns[target] || 1)
+            : (patterns[target] || 1);
+          const next = ((current - 1 + direction + 6) % 6) + 1;
+          if (queued) queuedPatterns[target] = next;
+          else {
+            patterns[target] = next;
+            delete queuedPatterns[target];
+          }
+        }
+
+        function rotatePattern(target, direction, queued) {
+          if (target === "all") {
+            Object.keys(Model.MIDI_TRACKS).forEach(function (key) { stepPattern(Number(key), direction, queued); });
+          } else {
+            stepPattern(target, direction, queued);
+          }
+          if (state.drumPattern && channel <= 7 && trackType === "Drum") {
+            state.drumPattern = drumSequenceFor(channel).slice();
+            state.drumPatternNumber = patterns[channel] || 1;
+            syncDrumSteps();
+          }
+          refreshPreviewReadout();
+          if (target === "all") {
+            const visiblePattern = queuedPatterns[channel] || patterns[channel] || 1;
+            stateReadout.textContent = "ALL TRACKS · PATTERN " + visiblePattern + (queued ? " QUEUED" : " SELECTED");
+          }
+        }
+
+        function presetChoices() {
+          const familyId = activeFamilyId();
+          const family = familyId ? catalog.tracks.find(function (item) { return item.id === familyId; }) || null : null;
+          if (!family) return [];
+          let choices = Model.availablePresets(catalog.presets, family);
+          if (trackType === "Synth") choices = choices.filter(function (preset) { return preset.engine === "Synth"; });
+          if (trackType === "DX") choices = choices.filter(function (preset) { return preset.engine === "DX"; });
+          return choices;
+        }
+
+        function rotateSound(direction) {
+          const choices = presetChoices();
+          if (!choices.length) {
+            stateReadout.textContent = "CH " + String(channel).padStart(2, "0") + " · " + Model.MIDI_TRACKS[channel].name + " · SOUND DATA NOT AVAILABLE" + (recording ? " · REC" : "");
+            return;
+          }
+          const current = soundIndexes[channel] || 0;
+          const next = (current + direction + choices.length) % choices.length;
+          soundIndexes[channel] = next;
+          state.presets = choices;
+          state.selectedIndex = next;
+          state.preset = choices[next];
+          state.source = familyOverride ? "demo" : "midi";
+          state.view = "sound";
+          state.until = 0;
+          syncSoundControls();
+          stateReadout.textContent = "CH " + String(channel).padStart(2, "0") + " · SOUND " + (next + 1) + "/" + choices.length + " · " + choices[next].name;
+          if (recording) stateReadout.textContent += " · REC";
+        }
+
+        function chooseFamily(familyId) {
+          const channelByFamily = { kick: 1, snare: 2, hat: 4, bass: 8, synth: 9 };
+          if (!Object.prototype.hasOwnProperty.call(channelByFamily, familyId)) return;
+          familyOverride = familyId;
+          channel = channelByFamily[familyId];
+          trackType = channel <= 7 ? "Drum" : "Synth";
+          updateTrackTypeOptions();
+          syncMidiChannelSelection();
+          makeState();
+          state = Model.selectFamily(state, familyId, catalog.presets, catalog.tracks, performance.now());
+          state.deviceTrack = Object.assign({}, Model.MIDI_TRACKS[channel], {
+            channel: channel,
+            name: Model.MIDI_TRACKS[channel].name + " / " + trackType.toUpperCase(),
+            family: familyId,
+            type: trackType
+          });
+          state.theme = theme;
+          state.recording = recording;
+          state.source = "demo";
+          syncPreviewControls();
+        }
+
+        function findEffect(scope, category, typeId) {
+          return catalog.effects.find(function (effect) {
+            const assignable = String(effect.assignable || "").split(",").map(function (item) { return item.trim(); });
+            return assignable.includes(scope) && effect.category === category && effect.msb + ":" + effect.lsb === typeId;
+          }) || null;
+        }
+
+        function fxParameters() {
+          return FxModel.getFxParameters(state.fx.effect, state.fx.scope, fxSpecs.parameters);
+        }
+
+        function fxParameterKey(scope, effect, number) {
+          const presetIdentity = state && state.fx && state.fx.scope === scope && state.fx.presetName
+            ? ["PRESET", state.fx.presetCategory, state.fx.presetNumber, state.fx.presetName].join("/")
+            : [effect && effect.msb, effect && effect.lsb].join("/");
+          return [scope, presetIdentity, number].join(":");
+        }
+
+        function fxParameterForNumber(number) {
+          return fxParameters().find(function (parameter) { return Number(parameter.number) === Number(number); }) || null;
+        }
+
+        function syncFxParameterOptions(preferredNumber) {
+          const select = document.getElementById("fxParameter");
+          const parameters = fxParameters();
+          select.replaceChildren();
+          if (!parameters.length) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "PARAMETER DATA UNAVAILABLE";
+            select.append(option);
+            select.disabled = true;
+            state.fx = Object.assign({}, state.fx, { parameter: null, parameterValue: null, formattedValue: null });
+            syncFxValueControl();
+            return;
+          }
+          parameters.forEach(function (parameter) {
+            const option = document.createElement("option");
+            option.value = String(parameter.number);
+            option.textContent = String(parameter.number).padStart(2, "0") + " / " + parameter.name;
+            select.append(option);
+          });
+          const selected = parameters.find(function (parameter) { return Number(parameter.number) === Number(preferredNumber); }) || parameters[0];
+          select.disabled = false;
+          select.value = String(selected.number);
+          const range = FxModel.rangeForParameter(selected);
+          const parameterValues = Object.assign({}, state.fx.parameterValues || {});
+          const valueKey = fxParameterKey(state.fx.scope, state.fx.effect, selected.number);
+          const savedValue = Number(parameterValues[valueKey]);
+          const existing = Number.isFinite(savedValue) ? savedValue : NaN;
+          const value = range
+            ? (Number.isFinite(existing) ? Math.max(range.min, Math.min(range.max, existing)) : Math.max(range.min, Math.min(range.max, 64)))
+            : null;
+          if (value !== null && !Number.isFinite(savedValue)) parameterValues[valueKey] = value;
+          state.fx = Object.assign({}, state.fx, {
+            parameter: selected,
+            parameterValue: value,
+            formattedValue: value === null ? null : FxModel.formatValue(selected, value, fxSpecs.assignTables),
+            parameterValues: parameterValues
+          });
+          syncFxValueControl();
+        }
+
+        function syncFxValueControl() {
+          const parameter = state.fx.parameter;
+          const range = FxModel.rangeForParameter(parameter);
+          const slider = document.getElementById("fxParamValue");
+          const label = document.getElementById("fxParamValueLabel");
+          const meta = document.getElementById("fxParamMeta");
+          if (!range) {
+            slider.disabled = true;
+            label.textContent = "—";
+            meta.textContent = parameter
+              ? "Value input is disabled because its documented range is ambiguous."
+              : "No parameter definition is available for this effect.";
+            document.querySelectorAll(".fx-test").forEach(function (button) { button.disabled = true; });
+            return;
+          }
+          slider.disabled = false;
+          slider.min = String(range.min);
+          slider.max = String(range.max);
+          slider.value = String(state.fx.parameterValue);
+          label.textContent = state.fx.formattedValue || String(state.fx.parameterValue);
+          meta.textContent = "Documented range: " + (parameter.display || "not specified") + " / Preview value: " + state.fx.parameterValue;
+          document.querySelectorAll(".fx-test").forEach(function (button) { button.disabled = false; });
+        }
+
+        function syncFxOptions(preferredCategory, preferredType) {
+          const scope = document.getElementById("fxScope").value;
+          const choices = catalog.effects.filter(function (effect) {
+            return String(effect.assignable || "").split(",").map(function (item) { return item.trim(); }).includes(scope);
+          });
+          const categories = Array.from(new Set(choices.map(function (effect) { return effect.category; })));
+          const categorySelect = document.getElementById("fxCategory");
+          categorySelect.replaceChildren();
+          categories.forEach(function (category) {
+            const option = document.createElement("option");
+            option.value = category;
+            option.textContent = category;
+            categorySelect.append(option);
+          });
+          const category = categories.includes(preferredCategory) ? preferredCategory : categories[0] || "";
+          categorySelect.value = category;
+          const types = choices.filter(function (effect) { return effect.category === category; });
+          const typeSelectFx = document.getElementById("fxType");
+          typeSelectFx.replaceChildren();
+          types.forEach(function (effect) {
+            const option = document.createElement("option");
+            option.value = effect.msb + ":" + effect.lsb;
+            option.textContent = effect.name;
+            typeSelectFx.append(option);
+          });
+          const selected = types.find(function (effect) { return effect.msb + ":" + effect.lsb === preferredType; }) || types[0] || null;
+          typeSelectFx.disabled = !selected;
+          categorySelect.disabled = !categories.length;
+          if (selected) typeSelectFx.value = selected.msb + ":" + selected.lsb;
+          state.fx = Object.assign({}, state.fx, {
+            scope: scope,
+            effect: selected,
+            controlChange: null,
+            receivedSlotLabel: null,
+            presetName: null,
+            presetCategory: null,
+            presetNumber: null,
+            presetType: null,
+            performance: null
+          });
+          syncFxParameterOptions(state.fx.parameter && state.fx.parameter.number);
+          updateFxHint();
+          syncFxUnitControls();
+        }
+
+        function setFxParameterValue(rawValue) {
+          const parameter = state.fx.parameter;
+          const range = FxModel.rangeForParameter(parameter);
+          const value = Number(rawValue);
+          if (!range || !Number.isInteger(value) || value < range.min || value > range.max) return false;
+          const parameterValues = Object.assign({}, state.fx.parameterValues || {});
+          parameterValues[fxParameterKey(state.fx.scope, state.fx.effect, parameter.number)] = value;
+          state.fx = Object.assign({}, state.fx, {
+            parameterValue: value,
+            formattedValue: FxModel.formatValue(parameter, value, fxSpecs.assignTables),
+            controlChange: null,
+            receivedSlotLabel: null,
+            parameterValues: parameterValues,
+            performance: null
+          });
+          state.view = "effect";
+          state.until = performance.now() + 2400;
+          syncFxValueControl();
+          updateFxHint();
+          syncFxUnitControls();
+          return true;
+        }
+
+        function updateFxHint() {
+          const hint = document.getElementById("fxVisualHint");
+          const parameter = state.fx.parameter;
+          if (state.fx.performance && state.fx.performance.active) hint.textContent = "Hold the touch strip to keep this performance effect active; release to bypass it.";
+          else if (state.fx.controlChange) hint.textContent = "The CC event does not identify the selected effect type.";
+          else if (!state.fx.effect) hint.textContent = "No effect type is selected.";
+          else if (!parameter) hint.textContent = "The graphic shows the effect category only; parameter data is unavailable.";
+          else if (!FxModel.rangeForParameter(parameter)) hint.textContent = parameter.name + " / Its value range is not documented clearly, so the graphic remains static.";
+          else hint.textContent = parameter.name + " / The graphic is illustrative, not an audio waveform.";
+        }
+
+        function hardwareFxScope() {
+          return fxUnitMode === "Master" ? "Master 1" : "Single";
+        }
+
+        function hardwareFxPresetList() {
+          return FxUnit.presetsFor(hardwareFxScope(), hardwareFxPresets, catalog.effects);
+        }
+
+        function parameterValueAt(number) {
+          const parameter = fxParameterForNumber(number);
+          const range = FxModel.rangeForParameter(parameter);
+          if (!parameter || !range) return { parameter: parameter, range: range, value: null };
+          const key = fxParameterKey(state.fx.scope, state.fx.effect, parameter.number);
+          const stored = Number(state.fx.parameterValues && state.fx.parameterValues[key]);
+          const current = state.fx.parameter && Number(state.fx.parameter.number) === Number(parameter.number)
+            ? Number(state.fx.parameterValue) : NaN;
+          const value = Number.isFinite(stored) ? stored : Number.isFinite(current) ? current : null;
+          return { parameter: parameter, range: range, value: value };
+        }
+
+        function syncFxUnitControls() {
+          if (!fxKnob) return;
+          const list = hardwareFxPresetList();
+          const preset = list[hardwareFxPresetIndex] || null;
+          const needleFraction = list.length > 1 ? hardwareFxPresetIndex / (list.length - 1) : 0;
+          document.getElementById("fxKnobIndicator").setAttribute("transform", "rotate(" + (-135 + needleFraction * 270) + " 1017 82)");
+          fxModeControl.setAttribute("aria-checked", String(fxUnitMode === "Master"));
+          document.getElementById("fxModeThumb").setAttribute("cx", fxUnitMode === "Master" ? "1001" : "1033");
+          fxPageControl.setAttribute("aria-pressed", String(fxUnitPage === 2));
+          fxPageControl.setAttribute("aria-label", "Simulator FX Page control. Current page " + fxUnitPage + ". Press to switch pages.");
+          fxPageControl.textContent = "SIM PAGE " + fxUnitPage;
+
+          const presetReadout = document.getElementById("fxUnitPresetReadout");
+          if (state.fx.presetName) {
+            presetReadout.textContent = "FX UNIT · " + fxUnitMode.toUpperCase() + " · " + state.fx.presetCategory + " " + state.fx.presetNumber + "/8 · " + state.fx.presetName;
+          } else if (state.fx.effect) {
+            presetReadout.textContent = "FX UNIT · " + fxUnitMode.toUpperCase() + " · " + state.fx.effect.name + " · TYPE PREVIEW";
+          } else {
+            presetReadout.textContent = "FX UNIT · " + fxUnitMode.toUpperCase() + " · EFFECT TYPE UNAVAILABLE";
+          }
+
+          const stripNames = ["fxLevel", "highPass", "repeater"];
+          const assignedNames = stripNames.map(function (stripName) {
+            const mapping = FxUnit.stripMapping(fxUnitPage, stripName);
+            if (mapping.kind === "performance") return mapping.parameter;
+            const found = fxParameterForNumber(mapping.number);
+            return found ? found.name : "PARAMETER " + mapping.number;
+          });
+          document.getElementById("fxUnitPageReadout").textContent = "PAGE " + fxUnitPage + " · " + assignedNames.join(" / ");
+
+          fxStripControls.forEach(function (strip) {
+            const key = strip.dataset.strip;
+            const mapping = FxUnit.stripMapping(fxUnitPage, key);
+            let fraction = 0;
+            let value = 0;
+            let min = 0;
+            let max = 127;
+            let disabled = false;
+            if (mapping.kind === "performance") {
+              const active = state.fx.performance && state.fx.performance.active && state.fx.performance.effect === mapping.effect;
+              value = active ? Number(state.fx.performance.value) : 0;
+              fraction = value / 127;
+              strip.setAttribute("aria-label", mapping.parameter + " touch strip. Hold to apply; release to bypass.");
+            } else {
+              const current = parameterValueAt(mapping.number);
+              disabled = !current.parameter || !current.range;
+              if (current.range) {
+                min = current.range.min;
+                max = current.range.max;
+                value = current.value === null ? Math.round((min + max) / 2) : current.value;
+                fraction = FxUnit.fraction(value, min, max);
+              }
+              const label = current.parameter ? current.parameter.name : "FX parameter " + mapping.number;
+              strip.setAttribute("aria-label", label + " touch strip for effect page " + fxUnitPage);
+            }
+            strip.classList.toggle("disabled", disabled);
+            strip.setAttribute("aria-disabled", String(disabled));
+            strip.setAttribute("aria-valuemin", String(min));
+            strip.setAttribute("aria-valuemax", String(max));
+            strip.setAttribute("aria-valuenow", String(value));
+            const indicator = strip.querySelector(".fx-touch-indicator");
+            indicator.setAttribute("cy", String(358 - fraction * 96));
+          });
+        }
+
+        function selectHardwareFxPreset(index) {
+          const list = hardwareFxPresetList();
+          if (!list.length) return false;
+          hardwareFxPresetIndex = ((Number(index) % list.length) + list.length) % list.length;
+          const preset = list[hardwareFxPresetIndex];
+          if (!preset || !preset.effect) {
+            document.getElementById("eventLog").textContent = "The selected documented preset type has no matching effect definition.";
+            syncFxUnitControls();
+            return false;
+          }
+          const effect = preset.effect;
+          document.getElementById("fxScope").value = hardwareFxScope();
+          syncFxOptions(effect.category, effect.msb + ":" + effect.lsb);
+          state.fx = Object.assign({}, state.fx, {
+            presetName: preset.name,
+            presetCategory: preset.category,
+            presetNumber: preset.number,
+            presetType: preset.type,
+            performance: null
+          });
+          syncFxParameterOptions(1);
+          state.view = "effect";
+          state.until = 0;
+          updateFxHint();
+          syncFxUnitControls();
+          return true;
+        }
+
+        function rotateHardwareFx(direction) {
+          const list = hardwareFxPresetList();
+          if (!list.length) return;
+          selectHardwareFxPreset(FxUnit.nextIndex(hardwareFxPresetIndex, direction, list.length));
+        }
+
+        function setFxUnitMode(mode) {
+          const previous = hardwareFxPresetList()[hardwareFxPresetIndex] || state.fx;
+          fxUnitMode = mode === "Master" ? "Master" : "Single";
+          const list = hardwareFxPresetList();
+          const nextIndex = FxUnit.findIndexForPreset(list, previous);
+          selectHardwareFxPreset(nextIndex);
+        }
+
+        function toggleFxUnitPage() {
+          fxUnitPage = fxUnitPage === 1 ? 2 : 1;
+          const mapping = FxUnit.stripMapping(fxUnitPage, "fxLevel");
+          if (mapping && mapping.kind === "effectParameter" && state.fx.effect) syncFxParameterOptions(mapping.number);
+          state.fx = Object.assign({}, state.fx, { performance: null });
+          state.view = "effect";
+          state.until = 0;
+          syncFxUnitControls();
+        }
+
+        function setHardwareStripValue(stripName, normalizedValue, active) {
+          const mapping = FxUnit.stripMapping(fxUnitPage, stripName);
+          const normalized = Math.max(0, Math.min(127, Math.round(Number(normalizedValue))));
+          if (!mapping) return false;
+          if (mapping.kind === "performance") {
+            state.fx = Object.assign({}, state.fx, {
+              performance: active ? {
+                effect: mapping.effect,
+                parameter: mapping.parameter,
+                value: normalized,
+                active: true
+              } : null,
+              controlChange: null,
+              receivedSlotLabel: null
+            });
+            state.view = "effect";
+            state.until = active ? 0 : performance.now() + 2400;
+            updateFxHint();
+            syncFxUnitControls();
+            return true;
+          }
+          const parameter = fxParameterForNumber(mapping.number);
+          const range = FxModel.rangeForParameter(parameter);
+          if (!parameter || !range) return false;
+          if (!state.fx.parameter || Number(state.fx.parameter.number) !== Number(mapping.number)) {
+            syncFxParameterOptions(mapping.number);
+          }
+          const value = Math.round(range.min + (normalized / 127) * (range.max - range.min));
+          return setFxParameterValue(value);
+        }
+
+        function svgPointY(event) {
+          const svg = event.currentTarget.ownerSVGElement || event.currentTarget.closest("svg");
+          if (svg && typeof svg.createSVGPoint === "function" && svg.getScreenCTM()) {
+            const point = svg.createSVGPoint();
+            point.x = event.clientX;
+            point.y = event.clientY;
+            return point.matrixTransform(svg.getScreenCTM().inverse()).y;
+          }
+          const rect = svg.getBoundingClientRect();
+          return ((event.clientY - rect.top) / rect.height) * svg.viewBox.baseVal.height;
+        }
+
+        function valueFromFxTouch(event) {
+          return FxUnit.pointerValue(svgPointY(event), 262, 358, 0, 127);
+        }
+
+        function attachFxTouchStrip(strip) {
+          let pointerId = null;
+          let performanceValue = 0;
+          const stripName = strip.dataset.strip;
+          function applyPointer(event, active) {
+            const value = valueFromFxTouch(event);
+            if (value === null) return;
+            if (FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance") performanceValue = value;
+            setHardwareStripValue(stripName, value, active);
+          }
+          strip.addEventListener("pointerdown", function (event) {
+            if (strip.getAttribute("aria-disabled") === "true") return;
+            event.preventDefault();
+            pointerId = event.pointerId;
+            strip.classList.add("active");
+            strip.setPointerCapture(event.pointerId);
+            applyPointer(event, true);
+          });
+          strip.addEventListener("pointermove", function (event) {
+            if (pointerId === event.pointerId) applyPointer(event, true);
+          });
+          function release(event) {
+            if (pointerId !== event.pointerId) return;
+            pointerId = null;
+            strip.classList.remove("active");
+            if (FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance") {
+              setHardwareStripValue(stripName, performanceValue, false);
+            } else {
+              syncFxUnitControls();
+            }
+          }
+          strip.addEventListener("pointerup", release);
+          strip.addEventListener("pointercancel", release);
+          strip.addEventListener("lostpointercapture", release);
+          strip.addEventListener("keydown", function (event) {
+            const direction = event.key === "ArrowUp" || event.key === "ArrowRight" ? 1
+              : event.key === "ArrowDown" || event.key === "ArrowLeft" ? -1 : 0;
+            const mapping = FxUnit.stripMapping(fxUnitPage, stripName);
+            if (strip.getAttribute("aria-disabled") === "true") return;
+            if (direction) {
+              event.preventDefault();
+              const current = Number(strip.getAttribute("aria-valuenow")) || 0;
+              const next = Math.max(0, Math.min(127, current + direction * 4));
+              if (mapping.kind === "performance") {
+                performanceValue = next;
+                strip.classList.add("active");
+                setHardwareStripValue(stripName, next, true);
+              } else {
+                setHardwareStripValue(stripName, next, false);
+              }
+            } else if ((event.key === "Enter" || event.key === " ") && FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance") {
+              event.preventDefault();
+              performanceValue = 127;
+              strip.classList.add("active");
+              setHardwareStripValue(stripName, performanceValue, true);
+            }
+          });
+          strip.addEventListener("keyup", function (event) {
+            const keyHeld = ["Enter", " ", "ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft"].includes(event.key);
+            if (keyHeld && FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance" && strip.classList.contains("active")) {
+              strip.classList.remove("active");
+              setHardwareStripValue(stripName, performanceValue, false);
+            }
+          });
+          strip.addEventListener("blur", function () {
+            if (strip.classList.contains("active") && FxUnit.stripMapping(fxUnitPage, stripName).kind === "performance") {
+              strip.classList.remove("active");
+              setHardwareStripValue(stripName, performanceValue, false);
+            }
+          });
+        }
+
+        function attachFxRotary(knob) {
+          let drag = null;
+          knob.addEventListener("pointerdown", function (event) {
+            event.preventDefault();
+            drag = { pointerId: event.pointerId, lastY: event.clientY, remainder: 0 };
+            knob.setPointerCapture(event.pointerId);
+          });
+          knob.addEventListener("pointermove", function (event) {
+            if (!drag || drag.pointerId !== event.pointerId) return;
+            drag.remainder += drag.lastY - event.clientY;
+            drag.lastY = event.clientY;
+            while (drag.remainder >= 12) { rotateHardwareFx(1); drag.remainder -= 12; }
+            while (drag.remainder <= -12) { rotateHardwareFx(-1); drag.remainder += 12; }
+          });
+          function finishDrag() { drag = null; }
+          knob.addEventListener("pointerup", finishDrag);
+          knob.addEventListener("pointercancel", finishDrag);
+          knob.addEventListener("wheel", function (event) {
+            event.preventDefault();
+            rotateHardwareFx(event.deltaY < 0 ? 1 : -1);
+          }, { passive: false });
+          knob.addEventListener("keydown", function (event) {
+            if (["ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft"].includes(event.key)) {
+              event.preventDefault();
+              rotateHardwareFx(event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1);
+            } else if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              rotateHardwareFx(1);
+            }
+          });
+        }
+
+        function syncMidiValueRange() {
+          const cc = Number(document.getElementById("midiController").value);
+          const definition = Model.SOUND_CONTROLLERS[cc];
+          const slider = document.getElementById("midiValue");
+          const min = definition ? definition.min : 0;
+          const max = definition ? definition.max : 127;
+          slider.min = String(min);
+          slider.max = String(max);
+          slider.value = String(Math.max(min, Math.min(max, Number(slider.value) || 0)));
+          document.getElementById("midiValueLabel").textContent = slider.value;
+        }
+
+        function populateMidiControls() {
+          const channelSelect = document.getElementById("midiChannel");
+          for (let midiChannel = 1; midiChannel <= 11; midiChannel++) {
+            const track = Model.MIDI_TRACKS[midiChannel];
+            const option = document.createElement("option");
+            option.value = String(midiChannel);
+            option.textContent = String(midiChannel).padStart(2, "0") + " / " + track.name;
+            channelSelect.append(option);
+          }
+          const controllerSelect = document.getElementById("midiController");
+          Model.CC_CHOICES.forEach(function (choice) {
+            const option = document.createElement("option");
+            option.value = String(choice.controller);
+            option.textContent = String(choice.controller).padStart(3, "0") + " / " + choice.name;
+            controllerSelect.append(option);
+          });
+          controllerSelect.value = "74";
+          channelSelect.value = String(channel);
+          syncMidiValueRange();
+        }
+
+        function applyMidiControlChange(midiChannel, controller, value) {
+          const event = Model.decodeControlChange(midiChannel, controller, value);
+          const eventLog = document.getElementById("eventLog");
+          if (!event.ok) {
+            eventLog.textContent = JSON.stringify(event, null, 2);
+            return event;
+          }
+          state = Model.applyControlChange(state, event, catalog.tracks, performance.now());
+          state.theme = theme;
+          state.recording = recording;
+          familyOverride = null;
+          if (event.kind === "sound" || event.scope === "Single") {
+            channel = event.kind === "sound" && event.parameter === "solo" && event.value > 0
+              ? event.value
+              : event.channel;
+            trackType = typeForChannel(channel);
+            updateTrackTypeOptions();
+            syncMidiChannelSelection();
+            state.drumPattern = trackType === "Drum" ? drumSequenceFor(channel).slice() : null;
+            state.drumPatternSource = trackType === "Drum" ? "PREVIEW" : null;
+            state.drumPatternNumber = patterns[channel] || 1;
+          }
+          syncPreviewControls();
+          updateFxHint();
+          eventLog.textContent = JSON.stringify(event, null, 2);
+          return event;
+        }
+
+        function applyBpm(rawValue, source) {
+          const value = Number(rawValue);
+          const eventLog = document.getElementById("eventLog");
+          if (!Number.isFinite(value) || value < 5 || value > 300) {
+            eventLog.textContent = "Enter a BPM value from 5 to 300.";
+            return false;
+          }
+          const previous = state.bpm;
+          state.bpmChange = previous !== null && previous !== value
+            ? { direction: value > previous ? "up" : "down", at: performance.now() }
+            : state.bpmChange;
+          state.bpm = value;
+          state.bpmSource = source || "preview";
+          state.view = "overview";
+          state.until = 0;
+          syncPerformanceControls();
+          eventLog.textContent = JSON.stringify({ source: state.bpmSource, bpm: value }, null, 2);
+          return true;
+        }
+
+        function applyNoteEvent(type, midiChannel, note, velocity) {
+          const ch = Number(midiChannel);
+          const key = Number(note);
+          const strength = Number(velocity);
+          if (!["noteOn", "noteOff"].includes(type) || !Number.isInteger(ch) || ch < 1 || ch > 16
+            || !Number.isInteger(key) || key < 0 || key > 127 || !Number.isInteger(strength) || strength < 0 || strength > 127) {
+            document.getElementById("eventLog").textContent = "Enter a valid MIDI channel, note number, and velocity.";
+            return false;
+          }
+          const timestamp = performance.now();
+          const noteEvents = (state.noteEvents || []).slice();
+          const isOn = type === "noteOn" && strength > 0;
+          let activeIndex = -1;
+          for (let index = noteEvents.length - 1; index >= 0; index--) {
+            const event = noteEvents[index];
+            if (event.channel === ch && event.note === key && event.endedAt === null) {
+              activeIndex = index;
+              break;
+            }
+          }
+          if (isOn) {
+            if (activeIndex >= 0) noteEvents[activeIndex] = Object.assign({}, noteEvents[activeIndex], { endedAt: timestamp });
+            noteEvents.push({ channel: ch, note: key, velocity: strength, startedAt: timestamp, endedAt: null });
+          } else if (activeIndex >= 0) {
+            noteEvents[activeIndex] = Object.assign({}, noteEvents[activeIndex], { endedAt: timestamp });
+          }
+          state.noteEvents = noteEvents.filter(function (event) {
+            return timestamp - (event.endedAt === null ? timestamp : event.endedAt) <= 8000;
+          }).slice(-24);
+          const activeSynth = state.noteEvents.slice().reverse().find(function (event) {
+            return event.channel >= 8 && event.channel <= 10 && event.endedAt === null;
+          });
+          state.activeNote = activeSynth ? activeSynth.note : null;
+          state.view = "overview";
+          state.until = 0;
+          document.getElementById("eventLog").textContent = JSON.stringify({
+            ok: true,
+            type: isOn ? "noteOn" : "noteOff",
+            channel: ch,
+            note: key,
+            velocity: isOn ? strength : 0
+          }, null, 2);
+          return true;
+        }
+
+        const legacyDemoEvents = [
+          ["30 43 00", "01 02"], ["30 44 00", "02 10"], ["30 45 00", "0C 70"],
+          ["31 27 00", "08 10"], ["30 41 00", "01 02"]
+        ];
+        let legacyDemoIndex = 0;
+
+        function parseHexBytes(raw, count) {
+          const tokens = String(raw).trim().replace(/^0x/i, "").split(/[\s,:-]+/).filter(Boolean);
+          if (tokens.length !== count || tokens.some(function (token) { return !/^[0-9a-f]{1,2}$/i.test(token); })) {
+            throw new Error("Expected " + count + " hexadecimal bytes");
+          }
+          return tokens.map(function (token) { return parseInt(token, 16); });
+        }
+
+        function applyLegacyFxEvent(addressInput, valueInput) {
+          const address = parseHexBytes(addressInput, 3);
+          const values = parseHexBytes(valueInput, 2);
+          if (address[2] !== 0) throw new Error("Only offset 00 is included in this legacy demo");
+          const prefix = address.slice(0, 2).map(function (byte) { return byte.toString(16).toUpperCase().padStart(2, "0"); }).join(" ");
+          const slots = { "30 41": "SEND REVERB", "30 42": "SEND VARIATION", "30 43": "MASTER 1", "30 44": "MASTER 2", "30 45": "MASTER 3", "30 46": "MASTER 4" };
+          let slot = slots[prefix];
+          if (!slot && address[0] === 0x31 && address[1] >= 0x20 && address[1] <= 0x2f) slot = "INSERT / PART " + (address[1] - 0x20);
+          if (!slot) throw new Error("Unknown legacy demo address");
+          const hex = function (byte) { return byte.toString(16).toUpperCase().padStart(2, "0"); };
+          const effect = catalog.effects.find(function (item) { return item.msb.toUpperCase() === hex(values[0]) && item.lsb.toUpperCase() === hex(values[1]); }) || null;
+          const scope = slot === "SEND REVERB" || slot === "SEND VARIATION" ? "Send" : slot.indexOf("MASTER ") === 0 ? slot.replace(/^MASTER /, "Master ") : "Single";
+          const shownEffect = effect || { name: "UNKNOWN " + hex(values[0]) + " " + hex(values[1]), category: "OTHER", msb: hex(values[0]), lsb: hex(values[1]) };
+          state.fx = Object.assign({}, state.fx, { scope: scope, effect: shownEffect, controlChange: null, receivedSlotLabel: slot });
+          if (effect) {
+            document.getElementById("fxScope").value = scope;
+            syncFxOptions(effect.category, effect.msb + ":" + effect.lsb);
+            state.fx = Object.assign({}, state.fx, { receivedSlotLabel: slot });
+          } else {
+            syncFxParameterOptions(null);
+          }
+          state.view = "effect";
+          state.until = 0;
+          updateFxHint();
+          document.getElementById("eventLog").textContent = JSON.stringify({ slot: slot, address: address.map(hex).join(" "), type: values.map(hex).join(" "), effect: effect ? effect.name : null, protocolVerifiedAgainstUserGuide: false }, null, 2);
+        }
+
+        function refreshRecordingControl() {
+          recordToggle.setAttribute("aria-pressed", String(recording));
+          recordToggle.textContent = recording ? "REC ON" : "REC OFF";
+          if (recordHardwareKey) {
+            recordHardwareKey.setAttribute("aria-pressed", String(recording));
+            recordHardwareKey.setAttribute("aria-label", recording ? "Stop simulated recording" : "Start simulated recording");
+            Array.from(recordHardwareKey.children).forEach(function (key) {
+              key.setAttribute("aria-pressed", String(recording));
+              key.setAttribute("aria-label", recording ? "Stop simulated recording" : "Start simulated recording");
+            });
+          }
+        }
+
+        function toggleRecordingPreview() {
+          recording = !recording;
+          refreshRecordingControl();
+          state.recording = recording;
+          refreshPreviewReadout();
+        }
+
+        function syncThemeControl() {
+          document.documentElement.setAttribute("data-theme", theme);
+          themeToggle.textContent = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+          themeToggle.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+          themeToggle.setAttribute("aria-pressed", String(theme === "light"));
+        }
+
+        function setActiveNote(note) {
+          const selectedSynthTrack = (channel === 8 || channel === 9) && trackType === "Synth" || channel === 10 && trackType === "DX";
+          if (!selectedSynthTrack) chooseChannel(8);
+          state = Object.assign({}, state, { activeNote: note });
+          const selectedTrack = Model.MIDI_TRACKS[channel];
+          stateReadout.textContent = "CH " + String(channel).padStart(2, "0") + " · " + selectedTrack.name + " · MIDI NOTE " + (note === null ? "RELEASED" : note) + (recording ? " · REC" : "");
+          noteKeys.querySelectorAll("button").forEach(function (button) {
+            button.setAttribute("aria-pressed", String(note !== null && Number(button.dataset.note) === note));
+          });
+        }
+
+        function attachTrackKnob(knob) {
+          const target = knob.dataset.channel === "all" ? "all" : Number(knob.dataset.channel);
+          let drag = null;
+          let suppressClick = false;
+          knob.addEventListener("pointerdown", function (event) {
+            event.preventDefault();
+            if (target !== "all") chooseChannel(target);
+            drag = { pointerId: event.pointerId, lastY: event.clientY, remainder: 0, moved: false };
+            knob.setPointerCapture(event.pointerId);
+          });
+          knob.addEventListener("pointermove", function (event) {
+            if (!drag || drag.pointerId !== event.pointerId) return;
+            drag.remainder += drag.lastY - event.clientY;
+            drag.lastY = event.clientY;
+            while (drag.remainder >= 14) { drag.moved = true; rotatePattern(target, 1, true); drag.remainder -= 14; }
+            while (drag.remainder <= -14) { drag.moved = true; rotatePattern(target, -1, true); drag.remainder += 14; }
+          });
+          function finishDrag() { suppressClick = Boolean(drag && drag.moved); drag = null; }
+          knob.addEventListener("pointerup", finishDrag);
+          knob.addEventListener("pointercancel", finishDrag);
+          knob.addEventListener("wheel", function (event) {
+            event.preventDefault();
+            if (target !== "all") chooseChannel(target);
+            rotatePattern(target, event.deltaY < 0 ? 1 : -1, Boolean(event.shiftKey || (target === "all" && allPatternMode)));
+          }, { passive: false });
+          knob.addEventListener("click", function () {
+            if (target !== "all") return;
+            if (suppressClick) { suppressClick = false; return; }
+            setAllPatternMode(!allPatternMode);
+          });
+          knob.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              if (target === "all") setAllPatternMode(!allPatternMode);
+              else chooseChannel(target);
+            } else if (event.key === "ArrowUp" || event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "ArrowLeft") {
+              event.preventDefault();
+              if (target !== "all") chooseChannel(target);
+              const direction = event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1;
+              rotatePattern(target, direction, Boolean(event.shiftKey || (target === "all" && allPatternMode)));
+            }
+          });
+        }
+
+        function attachSoundKnob(knob) {
+          let drag = null;
+          knob.addEventListener("pointerdown", function (event) {
+            event.preventDefault();
+            drag = { pointerId: event.pointerId, lastY: event.clientY, remainder: 0 };
+            knob.setPointerCapture(event.pointerId);
+          });
+          knob.addEventListener("pointermove", function (event) {
+            if (!drag || drag.pointerId !== event.pointerId) return;
+            drag.remainder += drag.lastY - event.clientY;
+            drag.lastY = event.clientY;
+            while (drag.remainder >= 14) { rotateSound(1); drag.remainder -= 14; }
+            while (drag.remainder <= -14) { rotateSound(-1); drag.remainder += 14; }
+          });
+          function finishDrag() { drag = null; }
+          knob.addEventListener("pointerup", finishDrag);
+          knob.addEventListener("pointercancel", finishDrag);
+          knob.addEventListener("wheel", function (event) {
+            event.preventDefault();
+            rotateSound(event.deltaY < 0 ? 1 : -1);
+          }, { passive: false });
+          knob.addEventListener("keydown", function (event) {
+            if (event.key === "ArrowUp" || event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "ArrowLeft") {
+              event.preventDefault();
+              rotateSound(event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1);
+            }
+          });
+        }
+
+        catalog.tracks.forEach(function (track) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "track-button";
+          button.dataset.id = track.id;
+          button.textContent = track.label;
+          button.addEventListener("click", function () { chooseFamily(track.id); });
+          familyButtons.append(button);
+        });
+
+        Object.keys(Model.MIDI_TRACKS).map(Number).forEach(function (value) {
+          const info = Model.MIDI_TRACKS[value];
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "track-button";
+          button.dataset.channel = String(value);
+          button.textContent = String(value).padStart(2, "0") + " " + info.name;
+          button.addEventListener("click", function () { chooseChannel(value); });
+          channelButtons.append(button);
+        });
+
+        trackKnobs.forEach(attachTrackKnob);
+        attachSoundKnob(soundKnobOne);
+
+        const pitchClasses = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        pitchClasses.forEach(function (pitchClass, offset) {
+          const note = 60 + offset;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "note-key";
+          button.dataset.note = String(note);
+          button.textContent = pitchClass;
+          button.setAttribute("aria-label", "Hold demo MIDI note " + pitchClass + "4 (" + note + ")");
+          button.setAttribute("aria-pressed", "false");
+          button.addEventListener("pointerdown", function (event) {
+            event.preventDefault();
+            button.setPointerCapture(event.pointerId);
+            setActiveNote(note);
+          });
+          function releasePointerNote() { setActiveNote(null); }
+          button.addEventListener("pointerup", releasePointerNote);
+          button.addEventListener("pointercancel", releasePointerNote);
+          button.addEventListener("lostpointercapture", releasePointerNote);
+          button.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setActiveNote(note);
+            }
+          });
+          button.addEventListener("keyup", function (event) {
+            if (event.key === "Enter" || event.key === " ") setActiveNote(null);
+          });
+          noteKeys.append(button);
+        });
+
+        recordToggle.addEventListener("click", toggleRecordingPreview);
+
+        typeSelect.addEventListener("change", function () {
+          trackType = typeSelect.value;
+          familyOverride = null;
+          makeState();
+        });
+
+        themeToggle.addEventListener("click", function () {
+          theme = theme === "dark" ? "light" : "dark";
+          syncThemeControl();
+          state.theme = theme;
+        });
+
+        document.getElementById("preset").addEventListener("change", function (event) {
+          const index = Number(event.target.value);
+          soundIndexes[channel] = index;
+          state = Model.selectPreset(state, index, performance.now());
+          state.theme = theme;
+          syncSoundControls();
+        });
+
+        ["cutoff", "resonance", "decay"].forEach(function (key) {
+          const controller = key === "cutoff" ? 74 : key === "resonance" ? 71 : 75;
+          document.getElementById(key).addEventListener("input", function (event) {
+            state = Model.setSoundParameter(state, key, Number(event.target.value), performance.now(), Model.SOUND_CONTROLLERS[controller]);
+            state.theme = theme;
+            document.getElementById(key + "Val").textContent = event.target.value;
+          });
+        });
+
+        document.getElementById("play").addEventListener("click", function () {
+          state.playing = !state.playing;
+          syncPerformanceControls();
+        });
+        document.getElementById("next").addEventListener("click", function () {
+          if (!state.presets.length) return;
+          const index = (state.selectedIndex + 1) % state.presets.length;
+          soundIndexes[channel] = index;
+          state = Model.selectPreset(state, index, performance.now());
+          state.theme = theme;
+          syncSoundControls();
+        });
+
+        document.getElementById("fxScope").addEventListener("change", function () {
+          const scope = document.getElementById("fxScope").value;
+          if (scope === "Single") fxUnitMode = "Single";
+          else if (/^Master/.test(scope)) fxUnitMode = "Master";
+          syncFxOptions(null, null);
+          state.view = "effect";
+          state.until = performance.now() + 2400;
+          syncFxUnitControls();
+        });
+        document.getElementById("fxCategory").addEventListener("change", function (event) {
+          syncFxOptions(event.target.value, null);
+          state.view = "effect";
+          state.until = performance.now() + 2400;
+          syncFxUnitControls();
+        });
+        document.getElementById("fxType").addEventListener("change", function (event) {
+          const scope = document.getElementById("fxScope").value;
+          const category = document.getElementById("fxCategory").value;
+          const effect = findEffect(scope, category, event.target.value);
+          state.fx = Object.assign({}, state.fx, {
+            effect: effect,
+            scope: scope,
+            presetName: null,
+            presetCategory: null,
+            presetNumber: null,
+            presetType: null,
+            performance: null
+          });
+          syncFxParameterOptions(null);
+          state.view = "effect";
+          state.until = performance.now() + 2400;
+          updateFxHint();
+          syncFxUnitControls();
+        });
+        document.getElementById("fxParameter").addEventListener("change", function (event) {
+          syncFxParameterOptions(Number(event.target.value));
+          state.view = "effect";
+          state.until = performance.now() + 2400;
+          syncFxUnitControls();
+        });
+        document.getElementById("fxParamValue").addEventListener("input", function (event) {
+          setFxParameterValue(Number(event.target.value));
+        });
+        document.getElementById("fxVisualIntensity").addEventListener("input", function (event) {
+          state.fx = Object.assign({}, state.fx, { visualIntensity: Number(event.target.value), controlChange: null });
+          document.getElementById("fxVisualIntensityVal").textContent = event.target.value;
+          state.view = "effect";
+          state.until = performance.now() + 2400;
+          updateFxHint();
+        });
+        document.querySelectorAll(".fx-test").forEach(function (button) {
+          button.addEventListener("click", function () {
+            const range = FxModel.rangeForParameter(state.fx.parameter);
+            if (!range) return;
+            const fraction = Number(button.dataset.level);
+            setFxParameterValue(Math.round(range.min + (range.max - range.min) * fraction));
+          });
+        });
+        fxStripControls.forEach(attachFxTouchStrip);
+        attachFxRotary(fxKnob);
+        fxModeControl.addEventListener("click", function () {
+          setFxUnitMode(fxUnitMode === "Master" ? "Single" : "Master");
+        });
+        fxModeControl.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setFxUnitMode(fxUnitMode === "Master" ? "Single" : "Master");
+          }
+        });
+        fxPageControl.addEventListener("click", toggleFxUnitPage);
+        fxPageControl.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleFxUnitPage();
+          }
+        });
+
+        document.getElementById("midiController").addEventListener("change", syncMidiValueRange);
+        document.getElementById("midiValue").addEventListener("input", function (event) {
+          document.getElementById("midiValueLabel").textContent = event.target.value;
+        });
+        document.getElementById("applyMidiEvent").addEventListener("click", function () {
+          applyMidiControlChange(document.getElementById("midiChannel").value, document.getElementById("midiController").value, document.getElementById("midiValue").value);
+        });
+        document.getElementById("setBpmPreview").addEventListener("click", function () {
+          applyBpm(document.getElementById("bpmPreview").value, "preview");
+        });
+        document.getElementById("bpmDownPreview").addEventListener("click", function () {
+          if (state.bpm !== null) applyBpm(state.bpm - 1, "preview");
+        });
+        document.getElementById("bpmUpPreview").addEventListener("click", function () {
+          if (state.bpm !== null) applyBpm(state.bpm + 1, "preview");
+        });
+        document.getElementById("noteOnPreview").addEventListener("click", function () {
+          applyNoteEvent("noteOn", document.getElementById("midiChannel").value, document.getElementById("noteNumber").value, document.getElementById("noteVelocity").value);
+        });
+        document.getElementById("noteOffPreview").addEventListener("click", function () {
+          applyNoteEvent("noteOff", document.getElementById("midiChannel").value, document.getElementById("noteNumber").value, 0);
+        });
+        document.getElementById("applyFxEvent").addEventListener("click", function () {
+          try {
+            applyLegacyFxEvent(document.getElementById("sysexAddress").value, document.getElementById("sysexValue").value);
+          } catch (error) {
+            document.getElementById("eventLog").textContent = "ERROR: " + error.message;
+          }
+        });
+        document.getElementById("demoFxSequence").addEventListener("click", function () {
+          const item = legacyDemoEvents[legacyDemoIndex++ % legacyDemoEvents.length];
+          document.getElementById("sysexAddress").value = item[0];
+          document.getElementById("sysexValue").value = item[1];
+          try {
+            applyLegacyFxEvent(item[0], item[1]);
+          } catch (error) {
+            document.getElementById("eventLog").textContent = "ERROR: " + error.message;
+          }
+        });
+
+        buildDrumHardwarePads();
+        buildSynthHardwareKeys();
+        updateTrackTypeOptions();
+        populateMidiControls();
+        syncThemeControl();
+        refreshRecordingControl();
+        makeState();
+        syncFxOptions(null, null);
+        selectHardwareFxPreset(0);
+
+        function draw(time) {
+          if (state.view !== "overview" && state.until && Number(time) > Number(state.until)) {
+            state = Object.assign({}, state, { view: "overview", until: 0 });
+          }
+          Renderer.render(ctx, state, time, FxModel);
+          window.requestAnimationFrame(draw);
+        }
+        window.requestAnimationFrame(draw);
+      });
+    </script>
   </body>
 </html>

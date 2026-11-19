@@ -1,52 +1,52 @@
-# SEQTRAK FIELD DISPLAY v1.3.7
+# SEQTRAK Field Display
 
-Mac browser prototype for the display-only SEQTRAK companion screen. The display canvas uses 320×170 logical coordinates and a 1280×680 backing store.
+Yamaha SEQTRAKと一緒に使うことを想定した、外付けディスプレイUIのプロトタイプです。
 
-## Run
+## 概要とコンセプト
 
-Open `index.html` in a browser. Space Grotesk and IBM Plex Mono are loaded from Google Fonts, so the browser needs an internet connection to render those exact font files. The font families are fixed in `styles.css`; there is no font selector.
+SEQTRAK本体の操作感や音楽制作の流れを尊重しながら、演奏中に確認したい情報を小さな画面にすばやく表示することを目指しています。SEQTRAK本体を改造したり、置き換えたりするためのものではありません。本体のそばに置く補助ディスプレイとして、音楽制作やライブセットでの判断を助け、ミュージシャンが音づくりや演奏に集中できる体験を提案します。
 
-## GitHub Pages
+画面の階層や操作を増やすのではなく、本体で選んだトラックや行った操作に応じて必要な情報が表れることを基本方針としています。短い視線移動でトラック、音色、エフェクト、演奏状態を把握できるよう、グラフィックと文字の優先順位を整理します。取得できていない情報は推測せず、分からないことが分かる表示にします。
 
-This is a static site and needs no build step. Keep `index.html` at the repository root, then configure GitHub Pages to deploy from the root of the `main` branch. A project repository named `seqtrak-field-display` is served at `https://neotrance.github.io/seqtrak-field-display/`.
+## デザイン方針
 
-## Language and appearance
+- KICK、SNARE、HI-HAT、BASS、SYNTHをグラフィックで見分けやすくする
+- 音色を選んだときは、プリセット名を読み取りやすく表示する
+- エフェクトの種類とパラメーターに応じて表示を変える
+- 画面遷移を増やさず、制作やライブの流れを止めない
+- フォントはSpace GroteskとIBM Plex Monoを使用する
+- Macブラウザ用プレビューは実機想定画面を拡大して確認できるようにする
 
-- The preview opens in English. Use the language selector at the upper right to switch between English and Japanese.
-- Use the adjacent control to switch between dark and light appearance. The setting applies to both the browser controls and the 320 × 170 display preview.
-- Preset names and effect names remain in their source data spelling in either language.
+## ページ
 
-## PC and smartphone layout
+- [`index.html`](index.html) — トップページ。ハードウェアと外付けディスプレイを並べたプレビュー
+- [`display-preview.html`](display-preview.html) — 旧プレビュー。引き続き残しています
+- [`hardware-preview.html`](hardware-preview.html) — `index.html`へ移動する互換ページ
 
-- On PC, the preview stays in the left column while the controls on the right scroll independently.
-- On smartphones, the preview remains in the upper area and the controls scroll in the lower area.
-- The preview frame keeps the 320:170 aspect ratio in both layouts.
+## 現在のプロトタイプ
 
-## Preview controls
+ブラウザ上でライト／ダーク表示、トラックや音色のプレビュー、FX表示、MIDIイベントのデモ、BPMやノートの表示、ドラムのステップ表示を試せます。本体図ではFXノブを回してマニュアル記載の8カテゴリー×8プリセットを選択し、MASTER/SINGLEとFX Pageを切り替えられます。タッチストリップはマニュアルにあるPage 1/2の割当に従い、Page 1のHIGH PASSとREPEATERは押している間だけ有効になる操作を再現します。Drum Sectionの16パッドを押すと、選択中のドラムトラックのプレビューシーケンスが切り替わります。
 
-- DISPLAY FAMILY and SOUND PRESET are local preview controls.
-- The MIDI CC panel applies documented control-change examples to the preview only. It does not connect to a MIDI device or send messages.
-- MUTE and SOLO CC values use the documented thresholds and target-track encoding. The guide says these CCs are receive-only, so physical button changes are not inferred from outbound MIDI.
-- TRACK VOLUME (CC 7) is separate from the VOL+ / VOL- master-volume buttons. Master volume appears only when an integration supplies an explicit display value.
-- The performance preview can display a supplied BPM from 5 to 300 and recent MIDI note-on/note-off events. Its note plot does not read or invent a saved pattern; MIDI thru may omit arpeggiator trigger notes and notes on muted tracks.
-- BPM and MIDI note controls in the right panel are preview-only inputs. The public `seqtrakUpdate` and `seqtrakNoteEvent` hooks accept values from a future integration; `masterVolumeDisplay` is a caller-formatted value because the guide does not define a master-volume MIDI scale.
-- A future adapter can pass `bpm`, `channel`, `volume`, `muted`, and `soloTrack` through `seqtrakUpdate`, and live notes through `seqtrakNoteEvent`. These hooks do not connect to USB or BLE by themselves.
-- EFFECT DISPLAY controls are illustrative. Graphics describe parameter values and are not audio waveforms.
-- The collapsed v1.3.4 FX address test remains for compatibility. Its address mapping is not documented in the supplied Yamaha user guide and has not been verified with hardware.
+これらは操作感と表示を確認するためのシミュレーションです。ドラムのステップはこのページ内で手動編集するデモであり、SEQTRAK本体に保存されたパターンを読み取ったものではありません。シミュレーションは音を出しません。
 
-## Data checks
+現在のブラウザ版は実機と通信しません。USB／BLE MIDIの受信、録音状態の検出、SEQTRAK本体のパターンや音色情報の取得、LILYGO T-Display-S3向けファームウェアは今後の開発対象です。実際に取得できる情報とデモ表示を混同しないよう、ページ内にも制約を記載しています。
 
-The supplied Yamaha user guide lists 2,032 preset sounds and 392 preset sampler sounds. The carried-over catalog contains 2,032 non-sampler entries and 392 sampler entries. The guide also documents 11 MIDI channels and the CC assignments used by the MIDI event test.
+## 今後のサイト構成案
 
-Eight effect types have no parameter definition in the carried-over parameter table. Five parameter ranges have ambiguous three-number notation. The UI disables value input for those cases instead of filling in a range.
+サイト全体は、製品説明を読むだけでなく、本体図に触れながら表示の変化を試せるコンセプトページへ発展させる構想です。トップでは本体と外付けディスプレイを大きく見せ、スクロールに合わせてSOUND、SEQUENCE、FX、PERFORMANCEの各操作を体験できる流れを想定しています。各セクションは同じシミュレーター状態を共有し、動きは操作の意味を伝える範囲に絞ります。
 
-## Tests
+## プレビューとテスト
 
-Run the dependency-free Node.js test suite with:
+ビルド工程はありません。`index.html`をブラウザで開くとトップページを確認できます。Node.jsがある環境では、プロジェクトフォルダで次のコマンドを実行して自動テストを確認できます。
 
 ```sh
 node --test tests/*.test.js
 ```
 
-BLE MIDI and LILYGO T-Display-S3 support are not implemented in this prototype.
+## GitHub Pagesで公開する場合
 
+リポジトリのトップページとして使うときは、プロジェクト内のファイルとフォルダをリポジトリ直下に配置してください。GitHub Pagesが公開元としてそのブランチのルートを使う設定なら、`index.html`が最初に表示されます。`data`、`js`、`tests`などのフォルダ構成は保ってください。
+
+## 表記
+
+SEQTRAKはヤマハ株式会社の製品名です。このプロトタイプは独立した非公式のコンセプトであり、ヤマハ株式会社による提供・承認を示すものではありません。
