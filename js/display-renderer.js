@@ -1,15 +1,49 @@
 (function (root, factory) {
   const i18n = typeof module === "object" && module.exports ? require("./i18n.js") : root.SeqtrakI18n;
-  const api = factory(i18n);
+  const pixelArtIcons = typeof module === "object" && module.exports ? require("./pixelarticons.js") : root.SeqtrakPixelArtIcons;
+  const api = factory(i18n, pixelArtIcons);
   if (typeof module === "object" && module.exports) module.exports = api;
   root.SeqtrakDisplayRenderer = api;
-})(typeof globalThis === "object" ? globalThis : this, function (I18n) {
+})(typeof globalThis === "object" ? globalThis : this, function (I18n, PixelArtIcons) {
   "use strict";
 
   const WIDTH = 320;
   const PITCH_CLASSES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
   const DISPLAY_FONT = '"Space Grotesk", sans-serif';
   const DATA_FONT = '"IBM Plex Mono", monospace';
+  const TRACK_ICON_NAMES = Object.freeze({
+    kick: "trex",
+    snare: "drum",
+    hat: "bell-ring",
+    bass: "audio-waveform",
+    synth: "keyboard-music",
+    clap: "hand",
+    perc1: "notes",
+    perc2: "music",
+    sampler: "mic"
+  });
+  const TRACK_LABEL_IDS = Object.freeze({
+    KICK: "kick",
+    SNARE: "snare",
+    CLAP: "clap",
+    "HAT 1": "hat",
+    "HAT 2": "hat",
+    "HI-HAT": "hat",
+    "PERC 1": "perc1",
+    "PERC 2": "perc2",
+    BASS: "bass",
+    SYNTH: "synth",
+    "SYNTH 1": "synth",
+    "SYNTH 2": "synth",
+    DX: "synth",
+    SAMPLER: "sampler"
+  });
+  const TRACK_ICON_PATHS = {};
+  const TRACK_ICON_SHAPES = {};
+  Object.keys(TRACK_ICON_NAMES).forEach(function (trackId) {
+    const name = TRACK_ICON_NAMES[trackId];
+    TRACK_ICON_PATHS[trackId] = PixelArtIcons && PixelArtIcons[name] || "";
+  });
   const DARK_PALETTE = {
     screen: "#080A0D", text: "#F3F3EF", muted: "#A4ABB3", secondary: "#B6BCC3", subtle: "#77828B",
     neutral: "#AAB4BC", line: "#343A40", chartLine: "#273039", highlight: "#F4A86A", fxCc: "#7DD9B2",
@@ -67,6 +101,41 @@
     ctx.textAlign = "left";
   }
 
+  function trackIconId(track) {
+    if (!track) return null;
+    if (TRACK_ICON_NAMES[track.id]) return track.id;
+    const label = String(track.label || "").split("/")[0].trim().toUpperCase();
+    return TRACK_LABEL_IDS[label] || null;
+  }
+
+  function trackIconName(track) {
+    const id = trackIconId(track);
+    return id ? TRACK_ICON_NAMES[id] : null;
+  }
+
+  function drawPixelIcon(ctx, track) {
+    const trackId = trackIconId(track);
+    const name = trackId && TRACK_ICON_NAMES[trackId];
+    const pathData = trackId && TRACK_ICON_PATHS[trackId];
+    if (!name || !pathData || typeof Path2D !== "function") return false;
+    let shape = TRACK_ICON_SHAPES[name];
+    if (!shape) {
+      try {
+        shape = new Path2D(pathData);
+        TRACK_ICON_SHAPES[name] = shape;
+      } catch (_error) {
+        return false;
+      }
+    }
+    ctx.save();
+    ctx.translate(30, 69);
+    ctx.scale(2, 2);
+    ctx.fillStyle = getTrackColor(track);
+    ctx.fill(shape);
+    ctx.restore();
+    return true;
+  }
+
   function rule(ctx, x, y, x2, y2, color, width) {
     ctx.beginPath();
     ctx.strokeStyle = themedColor(color || palette.line);
@@ -78,6 +147,7 @@
 
   function drawShape(ctx, track, time) {
     const t = track || { id: "unknown" };
+    if (drawPixelIcon(ctx, t)) return;
     const x = 54;
     const y = 93;
     const color = getTrackColor(t);
@@ -648,5 +718,13 @@
     }
   }
 
-  return { render: render, drawText: drawText, displayTrack: displayTrack, getTrackColor: getTrackColor };
+  return {
+    render: render,
+    drawText: drawText,
+    displayTrack: displayTrack,
+    getTrackColor: getTrackColor,
+    trackIconNames: TRACK_ICON_NAMES,
+    trackIconName: trackIconName,
+    drawPixelIcon: drawPixelIcon
+  };
 });
