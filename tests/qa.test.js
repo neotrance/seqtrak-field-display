@@ -11,6 +11,7 @@ const stateModel = require(path.join(root, "js/display-state.js"));
 const fxModel = require(path.join(root, "js/fx-model.js"));
 const fxUnit = require(path.join(root, "js/fx-unit.js"));
 const i18n = require(path.join(root, "js/i18n.js"));
+const pixelArtIcons = require(path.join(root, "js/pixelarticons.js"));
 const renderer = require(path.join(root, "js/display-renderer.js"));
 
 function loadBrowserData(relativePath, property) {
@@ -68,6 +69,68 @@ test("family filters only return matching preset records", function () {
   assert.ok(synth.length > 0 && synth.every(function (preset) { return preset.engine === "Synth" || preset.engine === "DX"; }));
   assert.equal(missing.length, 0);
   assert.ok(catalog.tracks.every(function (track) { return track.num === ""; }));
+});
+
+test("track glyphs map to known families and hardware labels and render their paths", function () {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const expected = {
+    kick: "trex",
+    snare: "drum",
+    hat: "bell-ring",
+    bass: "audio-waveform",
+    synth: "keyboard-music",
+    clap: "hand",
+    perc1: "notes",
+    perc2: "music",
+    sampler: "mic"
+  };
+
+  assert.deepEqual(renderer.trackIconNames, expected);
+  assert.match(html, /js\/pixelarticons\.js[\s\S]*?js\/display-renderer\.js/);
+  assert.match(readme, /Pixelarticons[\s\S]*?MIT License/);
+  assert.match(readme, /Copyright \(c\) 2019 Gerrit Halfmann/);
+  assert.match(readme, /supplied T-Rex SVG path/i);
+  assert.equal(pixelArtIcons.trex, "M18 23H10V21H12V19H14V21H16V17H18V23ZM10 15H12V19H10V17H6V15H8V13H4V11H10V15ZM20 17H18V15H20V17ZM14 15H12V13H14V15ZM22 15H20V13H18V11H20V7H22V15ZM4 7H8V9H4V11H2V3H4V7ZM18 11H16V9H18V11ZM16 9H14V3H16V9ZM12 7H10V5H12V7ZM14 3H4V1H14V3Z");
+  assert.equal(pixelArtIcons["mic-off"], "M10 2h4v2h-4zM8 8h2v6H8zm2 6h4v2h-4zm4-10h2v6h-2zM4 10h2v6H4zm2 6h2v2H6zm2 2h8v2H8zm8-2h2v2h-2zm-2-2h2v2h-2zm-2-2h2v2h-2zm-2-2h2v2h-2zM8 8h2v2H8zM6 6h2v2H6zM4 4h2v2H4zM2 2h2v2H2zm16 16h2v2h-2zm2 2h2v2h-2zm-2-10h2v4h-2zm-7 10h2v2h-2z");
+  assert.equal(pixelArtIcons.volume, "M17 22h-2v-2h-2v-2h2V6h-2V4h2V2h2v20Zm-4-4h-2v-2h2v2ZM11 8v2H9v4h2v2H7V8h4Zm2 0h-2V6h2v2Z");
+  assert.match(readme, /MUTE.{0,40}mic-off[\s\S]*?VOL.{0,20}volume/);
+  Object.entries(expected).forEach(function ([trackId, iconName]) {
+    assert.equal(renderer.trackIconName({ id: trackId }), iconName);
+    assert.ok(pixelArtIcons[iconName].length > 0);
+  });
+  Object.entries({ "HAT 1": "hat", "HAT 2": "hat", CLAP: "clap", "PERC 1": "perc1", "PERC 2": "perc2", SAMPLER: "sampler" }).forEach(function ([label, trackId]) {
+    const hardwareTrack = renderer.displayTrack({
+      source: "midi",
+      deviceTrack: { name: label, channel: 1 },
+      track: null
+    });
+    assert.equal(renderer.trackIconName(hardwareTrack), expected[trackId]);
+  });
+
+  const hadPath2D = Object.prototype.hasOwnProperty.call(globalThis, "Path2D");
+  const previousPath2D = globalThis.Path2D;
+  const drawnPaths = [];
+  globalThis.Path2D = class TestPath2D {
+    constructor(pathData) { this.pathData = pathData; }
+  };
+  try {
+    const context = new Proxy({}, {
+      get: function (target, property) {
+        if (property === "fill") return function (shape) { drawnPaths.push(shape.pathData); };
+        if (property in target) return target[property];
+        return function () {};
+      },
+      set: function (target, property, value) { target[property] = value; return true; }
+    });
+    Object.keys(expected).forEach(function (trackId) {
+      assert.equal(renderer.drawPixelIcon(context, { id: trackId }), true);
+    });
+    assert.deepEqual(drawnPaths, Object.values(expected).map(function (iconName) { return pixelArtIcons[iconName]; }));
+  } finally {
+    if (hadPath2D) globalThis.Path2D = previousPath2D;
+    else delete globalThis.Path2D;
+  }
 });
 
 test("documented MIDI channel and CC mappings decode without inventing preset data", function () {
@@ -373,6 +436,17 @@ test("hardware preview simulates FX controls and 16 physical drum sequence pads"
   assert.match(html, /id="fxStripLabelLevel" x="1017"/);
   assert.match(html, /id="fxStripLabelHighPass" x="1112"/);
   assert.match(html, /id="fxStripLabelRepeater" x="1242"/);
+  ["sideVolumeUp", "sideVolumeDown", "sideDelete", "sideMute", "sideSolo", "sidePage", "sidePlay", "sideBpmUp", "sideBpmDown", "sideSwing", "sideProject"].forEach(function (id) {
+    assert.match(html, new RegExp("id=\\\"" + id + "\\\" class=\\\"hardware-side-control\\\""));
+  });
+  assert.match(html, /BPM \+/);
+  assert.match(html, /BPM −/);
+  assert.match(html, /Hold ALL while pressing Drum keys 1–6/);
+  assert.doesNotMatch(html, /drop-shadow\(/);
+  assert.doesNotMatch(html, /<rect x="12" y="14" width="1376" height="382"/);
+  assert.match(html, /<rect x="8" y="8" width="1376" height="382"[^>]*stroke="none"/);
+  assert.doesNotMatch(html, /<g fill="#303436">/);
+  assert.match(html, /<linearGradient id="body"[^>]*>[\s\S]*?stop-color="#ffffff"[\s\S]*?stop-color="#ffffff"/);
   assert.doesNotMatch(html, /FRONT VIEW · MONOCHROME/);
   assert.match(fxUnitSource, /HIGH PASS FILTER CUTOFF/);
   assert.match(fxUnitSource, /BEAT REPEAT LENGTH/);
@@ -516,6 +590,14 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
       querySelector: function () { return this.indicator || null; },
       getContext: function () { return context; }
     };
+    let markup = "";
+    Object.defineProperty(element, "innerHTML", {
+      get: function () { return markup; },
+      set: function (value) {
+        markup = String(value);
+        this.textContent = markup.replace(/<[^>]*>/g, "");
+      }
+    });
     return element;
   }
 
@@ -559,6 +641,11 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
     const knob = makeElement("", "G"); knob.dataset.channel = String(value); return knob;
   });
   const soundKnob = makeElement("", "G");
+  const hardwareSideControls = ["volume-up", "volume-down", "delete", "mute", "solo", "page", "play", "bpm-up", "bpm-down", "swing", "project"].map(function (action) {
+    const control = makeElement("", "RECT");
+    control.dataset.sideAction = action;
+    return control;
+  });
   const fxTests = ["0", "0.5", "1"].map(function (level) { const button = makeElement("", "BUTTON"); button.dataset.level = level; return button; });
   const document = {
     getElementById: function (id) { return elements.get(id); },
@@ -567,6 +654,7 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
     querySelectorAll: function (selector) {
       if (selector === ".track-knob") return knobs;
       if (selector === ".sound-knob[data-sound-knob='1']") return [soundKnob];
+      if (selector === ".hardware-side-control") return hardwareSideControls;
       if (selector === ".fx-test") return fxTests;
       if (selector === ".fx-touch-strip") return fxStripControls;
       return [];
@@ -583,6 +671,7 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
     SEQTRAK_CATALOG: catalog,
     SEQTRAK_FX_SPECS: fxSpecs,
     SEQTRAK_HARDWARE_FX_PRESETS: hardwareFxPresets,
+    SeqtrakPixelArtIcons: pixelArtIcons,
     SeqtrakDisplayState: stateModel,
     SeqtrakFxModel: fxModel,
     SeqtrakFxUnit: fxUnit,
@@ -596,10 +685,42 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
   assert.equal(elements.get("trackList").children.length, 11);
   assert.equal(elements.get("synthHardwareKeys").children.length, 7);
   assert.equal(elements.get("recordHardwareKey").children.length, 1);
+  const recordFace = elements.get("recordHardwareKey").children[0].children[0];
+  const recordMark = elements.get("recordHardwareKey").children[0].children[1];
+  assert.equal(recordFace.tagName, "RECT");
+  assert.equal(recordFace.attributes.rx, "2");
+  assert.equal(recordMark.tagName, "CIRCLE");
+  assert.equal(recordMark.attributes.r, "2.5");
+  assert.equal(elements.get("synthHardwareKeys").children[0].children[1].tagName, "RECT");
   assert.equal(elements.get("tracks").children.length, catalog.tracks.length);
   assert.equal(elements.get("midiChannel").children.length, 11);
   assert.equal(elements.get("midiController").children.length, stateModel.CC_CHOICES.length);
   assert.ok(elements.get("fxType").children.length > 0);
+  const sidePlay = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "play"; });
+  assert.equal(sidePlay.attributes["aria-pressed"], "false");
+  sidePlay.dispatch("click");
+  assert.equal(sidePlay.attributes["aria-pressed"], "false");
+  assert.match(elements.get("stateReadout").textContent, /BPM UNKNOWN/);
+  const sideBpmUp = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "bpm-up"; });
+  sideBpmUp.dispatch("click");
+  assert.match(elements.get("stateReadout").textContent, /BPM UNKNOWN/);
+  const sideVolumeUp = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "volume-up"; });
+  sideVolumeUp.dispatch("click");
+  assert.match(elements.get("stateReadout").textContent, /MASTER VOL \+ PRESSED · CURRENT LEVEL UNAVAILABLE/);
+  assert.match(elements.get("stateReadout").innerHTML, /class="state-readout-icon"[\s\S]*?<path d="M17 22h-2/);
+  elements.get("bpmPreview").value = "140";
+  elements.get("setBpmPreview").dispatch("click");
+  sidePlay.dispatch("click");
+  assert.equal(sidePlay.attributes["aria-pressed"], "true");
+  assert.equal(elements.get("drumHardwareSteps").children[0].classList.contains("playhead"), true);
+  assert.equal(elements.get("drumSteps").children[0].attributes["aria-current"], "step");
+  renderAt(1125);
+  assert.equal(elements.get("drumHardwareSteps").children[0].classList.contains("playhead"), false);
+  assert.equal(elements.get("drumHardwareSteps").children[1].classList.contains("playhead"), true);
+  elements.get("play").dispatch("click");
+  assert.equal(sidePlay.attributes["aria-pressed"], "false");
+  assert.match(elements.get("stateReadout").textContent, /SEQUENCE STOPPED/);
+  assert.equal(elements.get("drumHardwareSteps").children[1].classList.contains("playhead"), false);
   assert.match(elements.get("fxUnitPresetReadout").textContent, /FILTER 1\/8/);
   elements.get("fxKnob").dispatch("keydown", { key: "ArrowRight" });
   assert.match(elements.get("fxUnitPresetReadout").textContent, /FILTER 2\/8/);
@@ -623,13 +744,37 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
   elements.get("drumHardwareSteps").children[0].dispatch("click");
   assert.equal(elements.get("drumHardwareSteps").children[0].attributes["aria-pressed"], "true");
   assert.equal(elements.get("drumSteps").children[0].attributes["aria-pressed"], "true");
-  knobs[0].dispatch("click");
+  knobs[0].dispatch("keydown", { key: " " });
   assert.equal(knobs[0].attributes["aria-pressed"], "true");
+  assert.equal(knobs[1].attributes["aria-pressed"], "false");
   elements.get("drumHardwareSteps").children[2].dispatch("click", { detail: 1 });
   assert.match(elements.get("stateReadout").textContent, /ALL TRACKS · PATTERN 3 QUEUED/);
   elements.get("drumHardwareSteps").children[2].dispatch("click", { detail: 2 });
   assert.match(elements.get("stateReadout").textContent, /ALL TRACKS · PATTERN 3 SELECTED/);
-  knobs[0].dispatch("click");
+  knobs[0].dispatch("keyup", { key: " " });
+  assert.equal(knobs[0].attributes["aria-pressed"], "false");
+  assert.equal(knobs[1].attributes["aria-pressed"], "true");
+  const sideMute = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "mute"; });
+  sideMute.dispatch("keydown", { key: " " });
+  knobs[1].dispatch("pointerdown", { pointerId: 22, clientY: 90 });
+  assert.match(elements.get("stateReadout").textContent, /CH 01 · MUTED/);
+  knobs[1].dispatch("pointerup", { pointerId: 22 });
+  sideMute.dispatch("keyup", { key: " " });
+  knobs[0].dispatch("keydown", { key: " " });
+  sideMute.dispatch("pointerdown", { pointerId: 23 });
+  sideMute.dispatch("pointerup", { pointerId: 23 });
+  sideMute.dispatch("click");
+  assert.match(elements.get("stateReadout").innerHTML, /<path d="M10 2h4v2h-4z/);
+  knobs[0].dispatch("keyup", { key: " " });
+  assert.equal(knobs[0].attributes["aria-pressed"], "true");
+  knobs[2].dispatch("pointerdown", { pointerId: 24, clientY: 90 });
+  assert.match(elements.get("stateReadout").textContent, /CH 02 · MUTED · MUTE MODE/);
+  knobs[0].dispatch("pointerdown", { pointerId: 25, clientY: 90 });
+  assert.match(elements.get("stateReadout").textContent, /ALL TRACKS UNMUTED · MUTE MODE/);
+  knobs[0].dispatch("pointerup", { pointerId: 25 });
+  sideMute.dispatch("pointerdown", { pointerId: 26 });
+  sideMute.dispatch("pointerup", { pointerId: 26 });
+  sideMute.dispatch("click");
   assert.equal(knobs[0].attributes["aria-pressed"], "false");
   elements.get("synthHardwareKeys").children[0].dispatch("pointerdown");
   assert.equal(elements.get("synthHardwareKeys").children[0].classList.contains("pressed"), true);
