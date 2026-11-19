@@ -116,6 +116,8 @@
       muteByChannel: {},
       soloTrack: null,
       noteEvents: [],
+      activeNote: null,
+      recording: false,
       currentParameter: { key: "cutoff", name: "FILTER CUTOFF", value: 74, min: 0, max: 127 },
       playing: true,
       view: "overview",

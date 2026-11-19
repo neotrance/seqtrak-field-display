@@ -7,6 +7,7 @@
   "use strict";
 
   const WIDTH = 320;
+  const PITCH_CLASSES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
   const DISPLAY_FONT = '"Space Grotesk", sans-serif';
   const DATA_FONT = '"IBM Plex Mono", monospace';
   const DARK_PALETTE = {
@@ -215,6 +216,10 @@
   }
 
   function drawParameter(ctx, state, track, time) {
+    if (Array.isArray(state.drumPattern) && state.drumPattern.length === 16) {
+      drawDrumParameter(ctx, state, track);
+      return;
+    }
     const parameter = state.currentParameter || { name: "PARAMETER", value: null, min: 0, max: 127 };
     const value = parameter.value;
     const trackColor = getTrackColor(track);
@@ -231,17 +236,7 @@
     drawText(ctx, parameter.name, 12, 44, 11, trackColor, 700, "left", "display", 210);
     drawText(ctx, valueText, 306, 60, semanticValue ? 17 : 28, "#F7F6F1", 700, "right", "display", 180);
     if (parameter.key === "cutoff" || parameter.key === "resonance") {
-      const cutoff = Number(state.values.cutoff) / 127;
-      const resonance = Number(state.values.resonance) / 127;
-      ctx.strokeStyle = trackColor;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      for (let i = 0; i <= 290; i += 2) {
-        const u = i / 290;
-        const y = 123 - 56 / (1 + Math.exp((u - cutoff) * 18)) - resonance * 22 * Math.exp(-Math.pow((u - cutoff) * 18, 2));
-        if (i === 0) ctx.moveTo(15 + i, y); else ctx.lineTo(15 + i, y);
-      }
-      ctx.stroke();
+      drawFilterValueMeter(ctx, parameter, trackColor);
     } else if (parameter.key === "decay" || parameter.key === "attack") {
       drawMotif(ctx, track, time, parameter.key === "decay" ? value : 127 - Number(value || 0));
     } else if (!semanticValue && value !== null && value !== undefined) {
@@ -253,6 +248,37 @@
     }
     rule(ctx, 12, 137, 308, 137);
     drawText(ctx, state.preset ? tr(state, "soundTag") + "  " + state.preset.name : tr(state, "presetNotReceived"), 12, 153, 8, "#B4BBC1", 500, "left", "data", 288);
+  }
+
+  function drawFilterValueMeter(ctx, parameter, color) {
+    // Show only the received 0–127 controller value; this is not a modeled filter response.
+    const min = Number(parameter.min);
+    const max = Number(parameter.max);
+    const value = Number(parameter.value);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(value) || max <= min) return;
+
+    const x = 16;
+    const y = 105;
+    const width = 288;
+    const fraction = Math.max(0, Math.min(1, (value - min) / (max - min)));
+    const marker = x + width * fraction;
+    rule(ctx, x, y, x + width, y, palette.chartLine, 5);
+    rule(ctx, x, y, marker, y, color, 5);
+    for (let index = 0; index <= 4; index++) {
+      const tick = x + width * index / 4;
+      ctx.beginPath();
+      ctx.strokeStyle = themedColor(palette.muted);
+      ctx.lineWidth = 1;
+      ctx.moveTo(tick, y - 6);
+      ctx.lineTo(tick, y + 6);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.fillStyle = color;
+    ctx.arc(marker, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    drawText(ctx, String(min), x, 126, 7, palette.muted, 500, "left", "data");
+    drawText(ctx, String(max), x + width, 126, 7, palette.muted, 500, "right", "data");
   }
 
   function drawNoteTimeline(ctx, state, track, time) {
@@ -323,6 +349,10 @@
   }
 
   function drawOverview(ctx, state, track, time) {
+    if (Array.isArray(state.drumPattern) && state.drumPattern.length === 16) {
+      drawDrumSequenceOverview(ctx, state, track, time);
+      return;
+    }
     const trackColor = getTrackColor(track);
     drawText(ctx, track.num && track.num !== "--" ? track.num + "  " + track.label : track.label, 12, 42, 14, trackColor, 700, "left", "display");
     const sourceLabel = state.source === "demo" ? tr(state, "currentSound") : state.source === "event" ? tr(state, "event") : state.source.toUpperCase();
@@ -334,6 +364,81 @@
     const name = state.preset && state.preset.name;
     drawText(ctx, name || tr(state, "presetNotReceived"), 12, 153, name && name.length > 28 ? 9 : 12, "#F4F3EF", 700, "left", "display", 292);
     drawText(ctx, state.preset ? "#" + String(state.preset.number).padStart(3, "0") : "—", 309, 166, 8, trackColor, 500, "right", "data");
+  }
+
+  function drawDrumStepGrid(ctx, pattern, trackColor, x, y, cellHeight) {
+    const width = 198;
+    const gap = 2;
+    const cellWidth = (width - gap * 15) / 16;
+    pattern.forEach(function (active, index) {
+      const left = x + index * (cellWidth + gap);
+      ctx.fillStyle = active ? trackColor : palette.chartLine;
+      ctx.fillRect(left, y, cellWidth, cellHeight);
+      if (!active) {
+        ctx.strokeStyle = palette.line;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(left + 0.5, y + 0.5, cellWidth - 1, cellHeight - 1);
+      }
+    });
+    [0, 4, 8, 12].forEach(function (index) {
+      const center = x + index * (cellWidth + gap) + cellWidth / 2;
+      drawText(ctx, String(index + 1).padStart(2, "0"), center, y + cellHeight + 10, 6, palette.muted, 500, "center", "data");
+    });
+  }
+
+  function drawDrumDecay(ctx, state, trackColor, x, y, width, compact) {
+    const value = Number(state.values && state.values.decay);
+    if (!Number.isFinite(value)) return;
+    const fraction = Math.max(0, Math.min(1, value / 127));
+    drawText(ctx, "DECAY", x, y, compact ? 7 : 8, palette.muted, 600, "left", "data");
+    drawText(ctx, String(Math.round(value)), x + width, y, compact ? 9 : 12, trackColor, 700, "right", "display");
+    const barY = y + 7;
+    rule(ctx, x, barY, x + width, barY, palette.chartLine, compact ? 3 : 4);
+    rule(ctx, x, barY, x + width * fraction, barY, trackColor, compact ? 3 : 4);
+  }
+
+  function drawDrumSequenceOverview(ctx, state, track, time) {
+    const color = getTrackColor(track);
+    const channel = state.deviceTrack && state.deviceTrack.channel;
+    const patternNumber = Number(state.drumPatternNumber) || 1;
+    drawText(ctx, track.num && track.num !== "--" ? track.num + "  " + track.label : track.label, 12, 42, 14, color, 700, "left", "display");
+    drawTrackStatus(ctx, state, track, state.drumPatternSource || "PREVIEW");
+    drawShape(ctx, track, time);
+    rule(ctx, 92, 54, 92, 130);
+    drawText(ctx, "PATTERN " + String(patternNumber).padStart(2, "0") + " · 16 STEPS · PREVIEW", 105, 58, 7, palette.secondary, 600, "left", "data", 200);
+    drawDrumStepGrid(ctx, state.drumPattern, color, 105, 65, 20);
+    drawDrumDecay(ctx, state, color, 105, 107, 198, false);
+    rule(ctx, 10, 139, 310, 139);
+    drawText(ctx, state.preset ? state.preset.name : tr(state, "presetNotReceived"), 12, 155, 8, palette.secondary, 500, "left", "data", 250);
+    if (channel) drawText(ctx, "CH " + String(channel).padStart(2, "0"), 308, 164, 7, palette.muted, 500, "right", "data");
+  }
+
+  function drawDrumParameter(ctx, state, track) {
+    const parameter = state.currentParameter || { name: "PARAMETER", value: null, min: 0, max: 127 };
+    const color = getTrackColor(track);
+    const value = parameter.value;
+    drawText(ctx, parameter.name, 12, 45, 10, color, 700, "left", "display", 212);
+    drawText(ctx, value === null || value === undefined ? "—" : String(value), 306, 63, 25, palette.text, 700, "right", "display", 160);
+    if (value !== null && value !== undefined && Number.isFinite(Number(parameter.min)) && Number.isFinite(Number(parameter.max))) {
+      const span = Math.max(1, Number(parameter.max) - Number(parameter.min));
+      const fraction = Math.max(0, Math.min(1, (Number(value) - Number(parameter.min)) / span));
+      rule(ctx, 16, 78, 304, 78, palette.chartLine, 4);
+      rule(ctx, 16, 78, 16 + 288 * fraction, 78, color, 4);
+    }
+    const patternNumber = Number(state.drumPatternNumber) || 1;
+    drawText(ctx, "PATTERN " + String(patternNumber).padStart(2, "0") + " · 16 STEPS · PREVIEW", 12, 101, 7, palette.secondary, 600, "left", "data", 294);
+    drawDrumStepGrid(ctx, state.drumPattern, color, 105, 106, 20);
+    if (parameter.key !== "decay") drawDrumDecay(ctx, state, color, 12, 147, 294, true);
+    else drawText(ctx, "DECAY VALUE", 12, 153, 7, palette.muted, 500, "left", "data");
+  }
+
+  function drawActiveNote(ctx, note, track) {
+    if (note === null || note === undefined) return false;
+    const midiNote = Number(note);
+    if (!Number.isInteger(midiNote) || midiNote < 0 || midiNote > 127) return false;
+    const pitchClass = PITCH_CLASSES[midiNote % PITCH_CLASSES.length];
+    drawText(ctx, pitchClass, 160, 120, pitchClass.length === 1 ? 76 : 58, getTrackColor(track), 700, "center", "display");
+    return true;
   }
 
   function fxColor(category) {
@@ -379,8 +484,14 @@
     const max = hasValue ? range.max : 127;
     const fraction = Math.max(0, Math.min(1, (value - min) / Math.max(1, max - min)));
     const scopeKey = { Single: "singleEffect", Send: "sendEffect", "Master 1": "masterEffect1", "Master 2": "masterEffect2", "Master 3": "masterEffect3" }[fx.scope];
-    drawText(ctx, "FX / " + (scopeKey ? tr(state, scopeKey) : String(fx.scope).toUpperCase()), 12, 39, 10, color, 700, "left", "display");
-    drawText(ctx, effect.name, 12, 61, effect.name.length > 25 ? 12 : 16, "#F6F5F1", 700, "left", "display", 294);
+    const presetIndex = fx.presetNumber ? " · " + (fx.presetCategory || category) + " " + String(fx.presetNumber).padStart(2, "0") + "/08" : "";
+    drawText(ctx, "FX / " + (scopeKey ? tr(state, scopeKey) : String(fx.scope).toUpperCase()) + presetIndex, 12, 39, 9, color, 700, "left", "display", 296);
+    const displayedEffectName = fx.presetName || effect.name;
+    drawText(ctx, displayedEffectName, 12, 61, displayedEffectName.length > 25 ? 12 : 16, "#F6F5F1", 700, "left", "display", 294);
+    if (fx.performance && fx.performance.active) {
+      drawFxPerformance(ctx, fx.performance, color);
+      return;
+    }
     if (hasValue) {
       const mode = fxModel.semantic(parameter.name, category);
       drawFxParameterGraphic(ctx, mode, fraction, category, color, time);
@@ -399,6 +510,17 @@
       drawText(ctx, tr(state, "illustrativeIntensity"), 12, 153, 8, "#9CA5AE", 500, "left", "data", 260);
       drawText(ctx, tr(state, "noParameterValue"), 308, 166, 8, "#9CA5AE", 500, "right", "data");
     }
+  }
+
+  function drawFxPerformance(ctx, performance, color) {
+    const fraction = Math.max(0, Math.min(1, Number(performance.value) / 127));
+    const isHighPass = performance.effect === "highPass";
+    const label = isHighPass ? "HIGH PASS FILTER CUTOFF" : "BEAT REPEAT LENGTH";
+    drawText(ctx, "PERFORMANCE / ACTIVE WHILE HELD", 12, 84, 9, color, 700, "left", "display", 296);
+    drawText(ctx, label, 12, 104, 10, "#F6F5F1", 600, "left", "data", 296);
+    rule(ctx, 14, 126, 306, 126, palette.chartLine, 5);
+    rule(ctx, 14, 126, 14 + 292 * fraction, 126, color, 5);
+    drawText(ctx, "HOLD TO APPLY · RELEASE TO BYPASS", 12, 159, 8, "#A4ABB3", 500, "left", "data", 296);
   }
 
   function drawFxStaticGraphic(ctx, category, color, fraction) {
@@ -502,8 +624,17 @@
     drawText(ctx, "SEQTRAK", 10, 14, 10, "#F3F3EF", 700, "left", "display");
     drawText(ctx, state.playing ? "▶" : "■", 77, 14, 9, "#B6BCC3", 500, "left", "data");
     drawText(ctx, status, 160, 14, 8, "#77828B", 500, "center", "data");
+    if (state.recording === true) {
+      ctx.beginPath();
+      ctx.fillStyle = "#FF5B62";
+      ctx.arc(244, 10, 3, 0, Math.PI * 2);
+      ctx.fill();
+      drawText(ctx, "REC", 250, 14, 8, "#FF5B62", 700, "left", "data");
+    }
     drawText(ctx, bpmLabel, 310, 14, 9, "#B6BCC3", 500, "right", "data");
     rule(ctx, 10, 22, 310, 22);
+
+    if (drawActiveNote(ctx, state.activeNote, track)) return;
 
     if (state.view === "parameter") drawParameter(ctx, state, track, now);
     else if (state.view === "effect") drawFx(ctx, state, now, fxModel);

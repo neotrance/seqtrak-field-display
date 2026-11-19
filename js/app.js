@@ -373,7 +373,15 @@
     const recent = noteEvents.filter(function (item) {
       return timestamp - (item.endedAt === null ? timestamp : item.endedAt) <= 8000;
     }).slice(-24);
-    stateValue = Object.assign({}, stateValue, { noteEvents: recent, view: "overview", until: 0 });
+    const activeSynthNote = recent.slice().reverse().find(function (item) {
+      return item.channel >= 8 && item.channel <= 10 && item.endedAt === null;
+    });
+    stateValue = Object.assign({}, stateValue, {
+      noteEvents: recent,
+      activeNote: activeSynthNote ? activeSynthNote.note : null,
+      view: "overview",
+      until: 0
+    });
     return { ok: true, type: noteOn ? "noteOn" : "noteOff", channel: channel, note: note, velocity: velocity };
   }
 
