@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script>if (new URLSearchParams(window.location.search).get("embed") === "hardware") document.documentElement.dataset.embed = "hardware";</script>
-    <title>SEQTRAK + FIELD DISPLAY · Hardware preview</title>
+    <title>FIELD / 01 · Visual companion for SEQTRAK</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Manrope:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="data/catalog.js" defer></script>
     <script src="data/fx-specs.js" defer></script>
     <script src="data/seqtrak-fx-presets.js" defer></script>
@@ -109,10 +109,16 @@
       .drum-hardware-step[aria-pressed="true"] .step-indicator { opacity: 1; }
       .drum-hardware-step[aria-disabled="true"] { cursor: not-allowed; opacity: .38; }
       .drum-hardware-step:focus-visible .step-hit { stroke: #a44b17; stroke-width: 2; }
-      .fx-rotary, .fx-mode-control, .fx-page-control { cursor: pointer; outline: none; touch-action: none; }
+      .fx-rotary, .fx-mode-control, .fx-page-control, .sound-page-control { cursor: pointer; outline: none; touch-action: none; }
       .fx-rotary { cursor: grab; }
       .fx-rotary:active { cursor: grabbing; }
       .fx-rotary:focus-visible circle:first-child { stroke: #a44b17; stroke-width: 3; }
+      .sound-knob { cursor: grab; outline: none; touch-action: none; }
+      .sound-knob:active { cursor: grabbing; }
+      .sound-page-control:focus-visible rect { stroke: #a44b17; stroke-width: 2; }
+      .sound-index-light { fill: #555b5e; transition: fill 120ms ease, r 120ms ease, opacity 120ms ease; }
+      .sound-index-light.page-assigned { fill: var(--accent); opacity: .42; }
+      .sound-index-light.active { fill: var(--accent); opacity: 1; r: 3.2px; }
       .fx-mode-control:focus-visible .fx-mode-track { stroke: #a44b17; stroke-width: 2.5; }
       .fx-page-control { min-height: 24px; padding: 3px 8px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; cursor: pointer; }
       .fx-touch-strip { cursor: ns-resize; outline: none; touch-action: none; }
@@ -335,11 +341,11 @@
       header {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas: "identity tools" "summary tools";
+        grid-template-areas: "identity tools" "summary tools" "connect connect";
         align-items: start;
         column-gap: clamp(20px, 3vw, 44px);
         row-gap: 2px;
-        margin: 0 0 4px;
+        margin: 0 0 18px;
         padding: 0;
         border: 0;
       }
@@ -363,7 +369,7 @@
       }
       h1 {
         max-width: 100%;
-        font-size: clamp(48px, 5.2vw, 72px);
+        font-size: clamp(44px, 4.7vw, 64px);
         font-family: "Barlow Condensed", sans-serif;
         font-weight: 600;
         line-height: .96;
@@ -568,7 +574,7 @@
         .page { padding: 20px 18px 64px; }
         header {
           grid-template-columns: minmax(0, 1fr);
-          grid-template-areas: "tools" "identity" "summary";
+          grid-template-areas: "tools" "identity" "summary" "connect";
           row-gap: 8px;
           margin-bottom: 0;
         }
@@ -599,20 +605,22 @@
         .display-unit { width: 90%; }
       }
       .usb-connect-bar {
+        grid-area: connect;
         display: grid;
-        grid-template-columns: auto auto minmax(220px, 1fr) minmax(180px, auto);
+        grid-template-columns: minmax(150px, .7fr) minmax(190px, 1fr) auto minmax(220px, .9fr);
         align-items: center;
-        gap: 10px;
-        margin: 0 0 18px;
-        padding: 12px 0;
+        gap: 12px;
+        margin: 18px 0 0;
+        padding: 11px 0 0;
+        border-top: 1px solid var(--line);
       }
-      .usb-connect-intro { min-width: 170px; }
-      .usb-connect-intro strong { display: block; font: 600 12px var(--mono); letter-spacing: .06em; }
+      .usb-connect-intro { min-width: 0; }
+      .usb-connect-intro strong { display: block; font: 600 11px var(--mono); letter-spacing: .08em; }
       .usb-connect-intro span { display: block; margin-top: 3px; color: var(--muted); font: 9px/1.4 var(--mono); }
       .usb-connect-bar .midi-connection-actions { display: flex; gap: 6px; margin: 0; }
       .usb-connect-bar button,
       .usb-connect-bar select {
-        min-height: 34px;
+        min-height: 32px;
         border: 1px solid var(--line);
         border-radius: 0;
         background: var(--control);
@@ -620,12 +628,14 @@
         font: 10px var(--mono);
       }
       .usb-connect-bar button { padding: 0 12px; cursor: pointer; }
-      .usb-connect-bar button:disabled { cursor: not-allowed; opacity: .42; }
+      .usb-connect-bar button:disabled { display: none; }
       .usb-connect-bar select { width: 100%; padding: 0 10px; }
-      .usb-connect-bar .midi-connection-status { margin: 0; text-align: right; }
+      .usb-connect-bar .midi-connection-status { display: flex; align-items: center; gap: 8px; margin: 0; text-align: left; }
+      .usb-connect-bar .midi-connection-status::before { width: 7px; height: 7px; flex: 0 0 7px; border: 1px solid currentColor; border-radius: 50%; content: ""; }
+      .usb-connect-bar .midi-connection-status[data-state="listening"]::before { border-color: var(--accent); background: var(--accent); }
       @media (max-width: 900px) {
-        .usb-connect-bar { grid-template-columns: 1fr auto; }
-        .usb-connect-bar select, .usb-connect-bar .midi-connection-status { grid-column: 1 / -1; }
+        .usb-connect-bar { grid-template-columns: minmax(0, 1fr) auto; }
+        .usb-connect-bar .midi-connection-status, .usb-connect-bar select { grid-column: 1 / -1; }
         .usb-connect-bar .midi-connection-status { text-align: left; }
       }
       @media (max-width: 520px) {
@@ -635,13 +645,144 @@
         .usb-connect-bar .midi-connection-status { grid-column: auto; }
         .usb-connect-bar .midi-connection-actions button { flex: 1; }
       }
+      .tools-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 34px;
+        padding-bottom: 9px;
+        color: var(--muted);
+        font: 9px var(--mono);
+        letter-spacing: .1em;
+      }
+      .tools-heading span:first-child { color: var(--text); font-weight: 700; }
+      .demo-suite { display: block; margin-top: 18px; }
+      .tool-panel {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-top: 1px solid var(--line);
+        background: transparent;
+      }
+      .tool-panel:last-child { border-bottom: 1px solid var(--line); }
+      .tool-panel > summary {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto 20px;
+        align-items: center;
+        gap: 12px;
+        min-height: 62px;
+        padding: 0;
+        color: var(--text);
+        cursor: pointer;
+        list-style: none;
+        font-family: var(--mono);
+      }
+      .tool-panel > summary::-webkit-details-marker { display: none; }
+      .tool-panel > summary span { color: var(--muted); font-size: 9px; }
+      .tool-panel > summary strong { font-size: 12px; letter-spacing: .08em; }
+      .tool-panel > summary small { color: var(--muted); font-size: 8px; letter-spacing: .08em; }
+      .tool-panel > summary::after { content: "+"; grid-column: 4; color: var(--muted); font-size: 16px; }
+      .tool-panel[open] > summary::after { content: "−"; }
+      .tool-panel-content { width: min(760px, 100%); padding: 4px 0 42px 46px; }
+      .tool-panel-content > h2 { margin-top: 28px; }
+      .project-statement.compact {
+        display: block;
+        margin: 42px 0 0;
+        padding: 18px 0;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+      .project-statement.compact p { max-width: 900px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+      .project-statement.compact span { margin-right: 14px; color: var(--text); font: 9px var(--mono); letter-spacing: .1em; }
+      .operation-notes { margin-top: 16px; color: var(--muted); }
+      .operation-notes > summary { cursor: pointer; font: 9px var(--mono); letter-spacing: .1em; }
+      .operation-notes .note { max-width: 920px; margin-top: 12px; }
+      @media (max-width: 780px) {
+        .tools-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+        .tool-panel > summary { grid-template-columns: 28px minmax(0, 1fr) auto; }
+        .tool-panel > summary small { display: none; }
+        .tool-panel > summary::after { grid-column: 3; }
+        .tool-panel-content { padding-left: 0; }
+        .project-statement.compact span { display: block; margin: 0 0 6px; }
+      }
+
+      /* FIELD / 01 editorial landing treatment. Existing simulator behavior is unchanged. */
+      header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "identity tools" "connect connect";
+        row-gap: 0;
+        margin-bottom: clamp(26px, 4vw, 58px);
+      }
+      header > div:first-child { padding-top: 2px; }
+      .eyebrow {
+        margin: 0 0 clamp(36px, 5vw, 70px);
+        font: 600 14px/1 Manrope, sans-serif;
+        letter-spacing: -.03em;
+      }
+      .eyebrow::after { display: none; }
+      h1 {
+        max-width: none;
+        font-family: Manrope, sans-serif;
+        font-size: clamp(48px, 7.4vw, 116px);
+        font-weight: 600;
+        line-height: .86;
+        letter-spacing: -.055em;
+        word-spacing: .055em;
+        white-space: nowrap;
+      }
+      .page h1 > span {
+        display: inline;
+        margin: 0;
+        color: var(--accent);
+        font-size: inherit;
+        font-weight: inherit;
+        line-height: inherit;
+        letter-spacing: inherit;
+        vertical-align: baseline;
+        white-space: inherit;
+      }
+      .header-summary {
+        width: auto;
+        margin: clamp(24px, 2.6vw, 38px) 0 0;
+        font: 600 clamp(15px, 1.1vw, 18px)/1.42 Manrope, sans-serif;
+        white-space: nowrap;
+      }
+      .header-detail {
+        width: auto;
+        margin: 4px 0 0;
+        color: var(--muted);
+        font: 14px/1.55 Manrope, sans-serif;
+        white-space: nowrap;
+      }
+      .header-tools { align-self: start; margin-top: 0; }
+      .usb-connect-bar { margin-top: clamp(30px, 4vw, 54px); }
+      #hardware-view {
+        margin-inline: calc(clamp(20px, 5vw, 76px) * -1);
+        padding: clamp(28px, 4vw, 58px) clamp(20px, 5vw, 76px);
+        background: color-mix(in srgb, var(--control) 56%, var(--page));
+      }
+      .tools-heading { margin-top: clamp(48px, 7vw, 96px); }
+      @media (max-width: 780px) {
+        header {
+          grid-template-areas: "tools" "identity" "connect";
+          margin-bottom: 34px;
+        }
+        .eyebrow { margin: 28px 0 42px; }
+        h1 { font-size: clamp(44px, 12vw, 68px); line-height: .9; white-space: normal; }
+        .page h1 > span { display: inline; margin: 0; font-size: inherit; }
+        .header-summary { margin: 24px 0 0; font-size: 15px; }
+        .header-summary, .header-detail { width: min(100%, 58ch); white-space: normal; }
+        .header-detail { margin-top: 4px; }
+        #hardware-view { margin-inline: -18px; padding-inline: 18px; }
+      }
     </style>
     <style>
       :root[data-embed="hardware"] body { min-width: 320px; }
       :root[data-embed="hardware"] .page { width: 100%; max-width: none; margin: 0; padding: 8px clamp(8px, 1.5vw, 18px); }
       :root[data-embed="hardware"] .page > header { display: block !important; position: relative; height: 28px; margin: 0; padding: 0; }
       :root[data-embed="hardware"] .page > header > div:first-child,
-      :root[data-embed="hardware"] .page > header > .header-summary { display: none !important; }
+      :root[data-embed="hardware"] .page > header > .header-summary,
+      :root[data-embed="hardware"] .page > header > .header-detail { display: none !important; }
       :root[data-embed="hardware"] .header-tools { position: absolute; top: 0; right: 0; margin: 0; }
       :root[data-embed="hardware"] .header-tools nav { display: none; }
       :root[data-embed="hardware"] .header-tools button { min-width: 64px; min-height: 26px; }
@@ -666,8 +807,10 @@
     <div class="page">
       <header>
         <div>
-          <p class="eyebrow">A COMPANION DISPLAY FOR MUSIC IN MOTION</p>
-          <h1>SEQTRAK <span>FIELD DISPLAY</span></h1>
+          <p class="eyebrow">SEQTRAK / FIELD</p>
+          <h1>See what you <span>hear.</span></h1>
+          <p class="header-summary">An experimental visual interface and interactive simulator for Yamaha SEQTRAK.</p>
+          <p class="header-detail">A browser-based visual companion for SEQTRAK. Connect over USB-MIDI—no custom firmware required.</p>
         </div>
         <div class="header-tools">
           <nav aria-label="Page sections">
@@ -678,18 +821,16 @@
           </nav>
           <button id="themeToggle" type="button" aria-label="Switch to dark mode" aria-pressed="true">Switch to dark mode</button>
         </div>
-        <p class="header-summary">Sound, sequence, and performance state at a glance, so you can stay focused on the instrument.</p>
+        <section class="usb-connect-bar" aria-label="Connect SEQTRAK by USB MIDI">
+          <div class="usb-connect-intro">
+            <strong>USB-MIDI</strong>
+            <span>WEB APP · NO CUSTOM FIRMWARE</span>
+          </div>
+          <span id="midiConnectionStatus" class="midi-connection-status" role="status">NOT CONNECTED · CHROME / HTTPS</span>
+          <div class="midi-connection-actions"><button id="midiConnect" type="button">CONNECT SEQTRAK</button><button id="midiDisconnect" type="button" disabled>DISCONNECT</button></div>
+          <select id="midiInputSelect" aria-label="MIDI input port" disabled><option value="">MIDI INPUT · CONNECT TO DISCOVER</option></select>
+        </section>
       </header>
-
-      <section class="usb-connect-bar" aria-label="Connect SEQTRAK by USB MIDI">
-        <div class="usb-connect-intro">
-          <strong>CONNECT SEQTRAK</strong>
-          <span>WEB APP · USB-MIDI · NO CUSTOM FIRMWARE</span>
-        </div>
-        <div class="midi-connection-actions"><button id="midiConnect" type="button">CONNECT</button><button id="midiDisconnect" type="button" disabled>DISCONNECT</button></div>
-        <select id="midiInputSelect" aria-label="MIDI input port" disabled><option value="">Connect to list MIDI input ports</option></select>
-        <span id="midiConnectionStatus" class="midi-connection-status" role="status">Not connected · Chrome / HTTPS required</span>
-      </section>
 
       <main>
         <section id="hardware-view" class="scene" aria-label="SEQTRAK and external display front view">
@@ -697,39 +838,41 @@
             <div class="unit-label"><span>FIELD DISPLAY</span><span>320 × 170</span></div>
             <div class="bezel">
               <div class="screen"><canvas id="display" width="1280" height="680" aria-label="320 by 170 display preview"></canvas></div>
-              <div class="bezel-mark"><span>SEQTRAK</span><span>FIELD / 01</span></div>
+              <div class="bezel-mark"><span aria-hidden="true"></span><span>FIELD / 01</span></div>
             </div>
           </div>
 
           <div class="device-wrap">
-            <svg class="device-svg" viewBox="0 0 1400 410" role="img" aria-label="Monochrome front schematic of the SEQTRAK. Drum section pads are sequence controls; the Record key and Synth performance keys are interactive previews.">
+            <svg class="device-svg" viewBox="0 -20 1400 430" role="img" aria-label="Monochrome front schematic of the SEQTRAK. Drum section pads are sequence controls; the Record key and Synth performance keys are interactive previews.">
               <defs>
                 <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
                 <linearGradient id="knob" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#aeb2b4"/></linearGradient>
                 <pattern id="micGrid" width="18" height="18" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="3" fill="#898e90"/></pattern>
               </defs>
-              <rect x="8" y="8" width="1376" height="382" rx="17" fill="url(#body)" stroke="none"/>
+              <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="500" text-anchor="middle">
+                <text x="570" y="-5">BAR LEN</text><text x="613" y="-5">OCT</text><text x="657" y="-5">SCALE</text><text x="701" y="-5">KEY</text><text x="746" y="-5">REC SMP</text>
+              </g>
+              <rect x="8" y="8" width="1376" height="382" rx="17" fill="none" stroke="none"/>
               <rect x="22" y="23" width="42" height="350" rx="5" fill="#d4d6d7" stroke="#686d70"/>
-              <g fill="#24282a" font-family="IBM Plex Mono, monospace" font-size="8" text-anchor="middle">
-                <text transform="translate(43 53) rotate(-90)">VOL +</text><text transform="translate(43 93) rotate(-90)">VOL -</text>
-                <text transform="translate(43 133) rotate(-90)">DELETE</text><text transform="translate(43 173) rotate(-90)">MUTE</text>
-                <text transform="translate(43 213) rotate(-90)">SOLO</text><text transform="translate(43 253) rotate(-90)">PAGE</text>
-                <text transform="translate(43 294) rotate(-90)">PLAY</text>
+              <g fill="#24282a" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="500" text-anchor="middle">
+                <text transform="translate(43 53) rotate(-90)">VOL +</text><text transform="translate(43 103) rotate(-90)">VOL -</text>
+                <text transform="translate(43 153) rotate(-90)">DELETE</text><text transform="translate(43 203) rotate(-90)">MUTE</text>
+                <text transform="translate(43 253) rotate(-90)">SOLO</text><text transform="translate(43 303) rotate(-90)">PAGE</text>
+                <text transform="translate(43 353) rotate(-90)">PLAY</text>
               </g>
               <g aria-label="Left-side hardware button hit areas">
                 <rect id="sideVolumeUp" class="hardware-side-control" data-side-action="volume-up" x="25" y="38" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Master volume up button" aria-pressed="false"/>
-                <rect id="sideVolumeDown" class="hardware-side-control" data-side-action="volume-down" x="25" y="78" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Master volume down button" aria-pressed="false"/>
-                <rect id="sideDelete" class="hardware-side-control" data-side-action="delete" x="25" y="118" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Delete button. Tap, then choose a target control." aria-pressed="false"/>
-                <rect id="sideMute" class="hardware-side-control" data-side-action="mute" x="25" y="158" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Mute mode. Tap to toggle, then tap track knobs." aria-pressed="false"/>
-                <rect id="sideSolo" class="hardware-side-control" data-side-action="solo" x="25" y="198" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Solo button. Tap, then choose a track knob." aria-pressed="false"/>
-                <rect id="sidePage" class="hardware-side-control" data-side-action="page" x="25" y="238" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="FX page button" aria-pressed="false"/>
-                <rect id="sidePlay" class="hardware-side-control" data-side-action="play" x="25" y="278" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Play or stop the sequence preview" aria-pressed="false"/>
+                <rect id="sideVolumeDown" class="hardware-side-control" data-side-action="volume-down" x="25" y="88" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Master volume down button" aria-pressed="false"/>
+                <rect id="sideDelete" class="hardware-side-control" data-side-action="delete" x="25" y="138" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Delete button. Tap, then choose a target control." aria-pressed="false"/>
+                <rect id="sideMute" class="hardware-side-control" data-side-action="mute" x="25" y="188" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Mute mode. Tap to toggle, then tap track knobs." aria-pressed="false"/>
+                <rect id="sideSolo" class="hardware-side-control" data-side-action="solo" x="25" y="238" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Solo button. Tap, then choose a track knob." aria-pressed="false"/>
+                <rect id="sidePage" class="hardware-side-control" data-side-action="page" x="25" y="288" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="FX page button" aria-pressed="false"/>
+                <rect id="sidePlay" class="hardware-side-control" data-side-action="play" x="25" y="338" width="36" height="30" rx="2" tabindex="0" role="button" aria-label="Play or stop the sequence preview" aria-pressed="false"/>
               </g>
               <rect x="70" y="23" width="470" height="210" rx="5" fill="#eceeed" stroke="#8b9092"/>
               <rect x="548" y="23" width="218" height="210" rx="5" fill="#e4e6e5" stroke="#8b9092"/>
               <g fill="#262a2c" font-family="IBM Plex Mono, monospace" font-size="9" text-anchor="middle">
                 <text x="305" y="37">DRUM SECTION</text>
-                <text x="570" y="36">BAR LEN</text><text x="613" y="36">OCT</text><text x="657" y="36">SCALE</text><text x="701" y="36">KEY</text><text x="746" y="36">REC SMP</text>
                 <text x="124" y="54">ALL</text><text x="247" y="54">KICK</text><text x="370" y="54">SNARE</text><text x="493" y="54">CLAP</text>
                 <text x="124" y="219">HAT 1</text><text x="247" y="219">HAT 2</text><text x="370" y="219">PERC 1</text><text x="493" y="219">PERC 2</text>
                 <text x="605" y="54">SYNTH 1</text><text x="711" y="54">SYNTH 2</text><text x="605" y="219">DX</text><text x="711" y="219">SAMPLER</text>
@@ -786,17 +929,17 @@
               </g>
               <rect x="1078" y="34" width="218" height="184" fill="url(#micGrid)"/>
               <rect x="1307" y="23" width="69" height="350" rx="4" fill="#d1d3d3" stroke="#777d80"/>
-              <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="6.5" text-anchor="middle">
-                <text transform="translate(1341 48) rotate(90)">USB</text><text transform="translate(1341 84) rotate(90)">PHONES</text>
-                <text transform="translate(1341 120) rotate(90)">AUDIO IN</text><text transform="translate(1341 156) rotate(90)">MIDI</text>
-                <text transform="translate(1341 188) rotate(90)">BPM +</text><text transform="translate(1341 228) rotate(90)">BPM −</text>
-                <text transform="translate(1341 268) rotate(90)">SWING</text><text transform="translate(1341 308) rotate(90)">PROJECT ↑</text>
+              <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="8" font-weight="500" text-anchor="middle">
+                <text transform="translate(1341 45) rotate(90)">USB</text><text transform="translate(1341 89) rotate(90)">PHONES</text>
+                <text transform="translate(1341 133) rotate(90)">AUDIO IN</text><text transform="translate(1341 177) rotate(90)">MIDI</text>
+                <text transform="translate(1341 221) rotate(90)">BPM +</text><text transform="translate(1341 265) rotate(90)">BPM −</text>
+                <text transform="translate(1341 309) rotate(90)">SWING</text><text transform="translate(1341 353) rotate(90)">PROJECT ↑</text>
               </g>
               <g aria-label="Right-side hardware button hit areas">
-                <rect id="sideBpmUp" class="hardware-side-control" data-side-action="bpm-up" x="1310" y="172" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="BPM up button" aria-pressed="false"/>
-                <rect id="sideBpmDown" class="hardware-side-control" data-side-action="bpm-down" x="1310" y="212" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="BPM down button" aria-pressed="false"/>
-                <rect id="sideSwing" class="hardware-side-control" data-side-action="swing" x="1310" y="252" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Swing button. Tap, then rotate ALL; swing value is unavailable in this preview." aria-pressed="false"/>
-                <rect id="sideProject" class="hardware-side-control" data-side-action="project" x="1310" y="292" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Project up button. Tap, then press Drum keys 1 to 8." aria-pressed="false"/>
+                <rect id="sideBpmUp" class="hardware-side-control" data-side-action="bpm-up" x="1310" y="205" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="BPM up button" aria-pressed="false"/>
+                <rect id="sideBpmDown" class="hardware-side-control" data-side-action="bpm-down" x="1310" y="249" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="BPM down button" aria-pressed="false"/>
+                <rect id="sideSwing" class="hardware-side-control" data-side-action="swing" x="1310" y="293" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Swing button. Tap, then rotate ALL; swing value is unavailable in this preview." aria-pressed="false"/>
+                <rect id="sideProject" class="hardware-side-control" data-side-action="project" x="1310" y="337" width="63" height="32" rx="2" tabindex="0" role="button" aria-label="Project up button. Tap, then press Drum keys 1 to 8." aria-pressed="false"/>
               </g>
               <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="7.5">
                 <text x="793" y="43">SOUND</text><text x="793" y="59">PITCH</text><text x="793" y="75">MONO/POLY</text><text x="793" y="91">CHORD</text>
@@ -805,32 +948,42 @@
                 <text x="793" y="235">DELAY</text><text x="793" y="251">COMP</text><text x="793" y="267">DISTORTION</text><text x="793" y="283">MODULATION</text>
                 <text x="793" y="299">DUCKER</text><text x="793" y="315">OTHER</text><text x="793" y="331">MIXER</text><text x="793" y="347">SONG</text>
               </g>
-              <g fill="#555b5e">
-                <circle cx="854" cy="40" r="2.1"/><circle cx="854" cy="56" r="2.1"/><circle cx="854" cy="72" r="2.1"/><circle cx="854" cy="88" r="2.1"/>
-                <circle cx="854" cy="104" r="2.1"/><circle cx="854" cy="120" r="2.1"/><circle cx="854" cy="136" r="2.1"/><circle cx="854" cy="152" r="2.1"/>
-                <circle cx="854" cy="168" r="2.1"/><circle cx="854" cy="184" r="2.1"/><circle cx="854" cy="200" r="2.1"/><circle cx="854" cy="216" r="2.1"/>
-                <circle cx="854" cy="232" r="2.1"/><circle cx="854" cy="248" r="2.1"/><circle cx="854" cy="264" r="2.1"/><circle cx="854" cy="280" r="2.1"/>
-                <circle cx="854" cy="296" r="2.1"/><circle cx="854" cy="312" r="2.1"/>
+              <g>
+                <circle class="sound-index-light" data-index-label="SOUND" cx="854" cy="40" r="2.1"/><circle class="sound-index-light" data-index-label="PITCH" cx="854" cy="56" r="2.1"/><circle class="sound-index-light" data-index-label="MONO/POLY" cx="854" cy="72" r="2.1"/><circle class="sound-index-light" data-index-label="CHORD" cx="854" cy="88" r="2.1"/>
+                <circle class="sound-index-light" data-index-label="PAN" cx="854" cy="104" r="2.1"/><circle class="sound-index-light" data-index-label="VOLUME" cx="854" cy="120" r="2.1"/><circle class="sound-index-light" data-index-label="ATTACK" cx="854" cy="136" r="2.1"/><circle class="sound-index-light" data-index-label="DECAY" cx="854" cy="152" r="2.1"/>
+                <circle class="sound-index-light" data-index-label="MICRO TIMING" cx="854" cy="168" r="2.1"/><circle class="sound-index-light" data-index-label="FILTER" cx="854" cy="184" r="2.1"/><circle class="sound-index-light" data-index-label="RESONANCE" cx="854" cy="200" r="2.1"/><circle class="sound-index-light" data-index-label="REVERB" cx="854" cy="216" r="2.1"/>
+                <circle class="sound-index-light" data-index-label="DELAY" cx="854" cy="232" r="2.1"/><circle class="sound-index-light" data-index-label="COMP" cx="854" cy="248" r="2.1"/><circle class="sound-index-light" data-index-label="DISTORTION" cx="854" cy="264" r="2.1"/><circle class="sound-index-light" data-index-label="MODULATION" cx="854" cy="280" r="2.1"/>
+                <circle class="sound-index-light" data-index-label="DUCKER" cx="854" cy="296" r="2.1"/><circle class="sound-index-light" data-index-label="OTHER" cx="854" cy="312" r="2.1"/>
               </g>
               <g fill="#282c2e" font-family="IBM Plex Mono, monospace" font-size="6">
                 <text x="1027" y="43" text-anchor="middle">FX</text>
-                <text x="895" y="344" text-anchor="middle">PAGE / PARAMETER</text><text x="1027" y="198" text-anchor="middle">MASTER / SINGLE</text>
+                <text x="895" y="356" text-anchor="middle">PAGE / PARAMETER</text><text x="1027" y="194" text-anchor="middle">MASTER / SINGLE</text>
                 <text id="fxStripLabelLevel" x="1027" y="248" text-anchor="middle">FX LEVEL</text><text id="fxStripLabelHighPass" x="1127" y="248" text-anchor="middle">HIGH PASS</text><text id="fxStripLabelRepeater" x="1247" y="248" text-anchor="middle">REPEATER</text>
                 <text x="1187" y="43" text-anchor="middle">MIC</text>
               </g>
               <g class="sound-knob" data-sound-knob="1" tabindex="0" role="button" aria-label="Sound Design knob 1, change the selected track sound">
-                <circle cx="895" cy="75" r="25" fill="#d6d8d8" stroke="#565c5f" stroke-width="1.5"/><circle cx="895" cy="75" r="19" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/><path d="M895 57v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="895" cy="75" r="25" fill="#d6d8d8" stroke="#565c5f" stroke-width="1.5"/><circle cx="895" cy="75" r="19" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/><path id="soundKnobIndicator1" d="M895 57v8" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
               </g>
-              <g fill="url(#knob)" stroke="#565c5f" stroke-width="2">
-                <circle cx="895" cy="132" r="19"/><circle cx="895" cy="189" r="19"/><circle cx="895" cy="246" r="19"/>
+              <g class="sound-knob" data-sound-knob="2" tabindex="0" role="button" aria-label="Sound Design knob 2, simulated rotary position">
+                <circle cx="895" cy="132" r="19" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/><path id="soundKnobIndicator2" d="M895 115v7" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="sound-knob" data-sound-knob="3" tabindex="0" role="button" aria-label="Sound Design knob 3, simulated rotary position">
+                <circle cx="895" cy="189" r="19" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/><path id="soundKnobIndicator3" d="M895 172v7" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g class="sound-knob" data-sound-knob="4" tabindex="0" role="button" aria-label="Sound Design knob 4, simulated rotary position">
+                <circle cx="895" cy="246" r="19" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/><path id="soundKnobIndicator4" d="M895 229v7" stroke="#596064" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <g id="soundPageControl" class="sound-page-control" tabindex="0" role="button" aria-label="Sound Design page. Current page 1. Press to change page.">
+                <rect x="871" y="315" width="48" height="25" rx="3" fill="transparent" stroke="transparent"/>
+                <circle cx="887" cy="327" r="2" fill="#596064"/><circle cx="895" cy="327" r="2" fill="#596064"/><circle cx="903" cy="327" r="2" fill="#596064"/>
               </g>
               <g id="fxKnob" class="fx-rotary" tabindex="0" role="button" aria-label="FX knob. Rotate to select an effect preset; hold a track knob while rotating to select that track's sound.">
                 <circle cx="1027" cy="82" r="23" fill="url(#knob)" stroke="#565c5f" stroke-width="2"/>
                 <path id="fxKnobIndicator" d="M1027 62v9" stroke="#596064" stroke-width="2.5" stroke-linecap="round"/>
               </g>
               <g id="fxModeControl" class="fx-mode-control" tabindex="0" role="switch" aria-label="MASTER/SINGLE effect target" aria-checked="false">
-                <rect class="fx-mode-track" x="991" y="168" width="72" height="13" rx="6.5" fill="#9da2a4" stroke="#555b5d"/>
-                <circle id="fxModeThumb" cx="1053" cy="174.5" r="5.5" fill="#f4f4f2" stroke="#555b5d"/>
+                <rect class="fx-mode-track" x="1000" y="168" width="54" height="13" rx="6.5" fill="#9da2a4" stroke="#555b5d"/>
+                <circle id="fxModeThumb" cx="1045" cy="174.5" r="5.5" fill="#f4f4f2" stroke="#555b5d"/>
               </g>
               <g stroke="#73797b" stroke-width="2" stroke-linecap="round">
                 <path d="M1000 264h54 M1000 276h54 M1000 288h54 M1000 300h54 M1000 312h54 M1000 324h54 M1000 336h54 M1000 348h54"/>
@@ -852,11 +1005,13 @@
             </svg>
           </div>
           <div class="fx-unit-readout" aria-live="polite">
+            <span id="soundUnitPageReadout">SOUND DESIGN · PAGE 1</span>
             <span id="fxUnitPresetReadout">FX UNIT · SINGLE · FILTER 1/8</span>
             <span id="fxUnitPageReadout">PAGE 1 · EFFECT PARAMETER 1 / HIGH PASS CUTOFF / BEAT REPEAT LENGTH</span>
             <button id="fxPageControl" class="fx-page-control" type="button" aria-label="Simulator FX Page control. Press to switch between page 1 and page 2." aria-pressed="false">SIM PAGE 1</button>
           </div>
         </section>
+        <div class="tools-heading"><span>QUICK CONTROLS</span><span>SIMULATOR / RECEIVE-ONLY MIDI</span></div>
 
         <section id="preview-controls" class="controls" aria-label="Preview controls">
           <div>
@@ -878,8 +1033,9 @@
           <div id="stateReadout" class="state-readout" aria-live="polite"></div>
         </section>
         <section id="sound-design" class="demo-suite" aria-label="Sound, effects, and MIDI parameter demos">
-          <section class="demo-card">
-            <h2>DISPLAY FAMILY / SOUND DEMO</h2>
+          <details class="demo-card tool-panel" open>
+            <summary><span>01</span><strong>SOUND + SEQUENCE</strong><small>PRESET / FILTER / 16 STEPS</small></summary>
+            <div class="tool-panel-content">
             <div id="tracks" class="track-list" aria-label="Display family"></div>
             <label for="preset"><span>SOUND PRESET</span><output id="count"></output></label>
             <select id="preset"></select>
@@ -896,10 +1052,12 @@
               <p class="help">Set a preview BPM and press PLAY to move through the 16 steps. Visual simulation only; it produces no audio and does not read the SEQTRAK pattern.</p>
             </div>
             <div class="actions"><button id="play" type="button" aria-pressed="false">▶ PLAY SEQUENCE</button><button id="next" type="button">NEXT SOUND →</button></div>
-          </section>
+            </div>
+          </details>
 
-          <section class="demo-card">
-            <h2>EFFECT DISPLAY / DEMO</h2>
+          <details class="demo-card tool-panel">
+            <summary><span>02</span><strong>EFFECT DISPLAY</strong><small>TYPE / PARAMETER / LEVEL</small></summary>
+            <div class="tool-panel-content">
             <label for="fxScope"><span>EFFECT SLOT</span></label>
             <select id="fxScope">
               <option value="Single">SINGLE EFFECT</option><option value="Send">SEND EFFECT</option>
@@ -922,10 +1080,12 @@
               <label for="sysexValue"><span>EFFECT TYPE · MSB / LSB</span></label><input id="sysexValue" value="01 02" spellcheck="false">
               <div class="actions"><button id="applyFxEvent" type="button">TRY LEGACY EVENT</button><button id="demoFxSequence" type="button">LEGACY DEMO</button></div>
             </details>
-          </section>
+            </div>
+          </details>
 
-          <section class="demo-card">
-            <h2>MIDI DEBUG / DEMO</h2>
+          <details class="demo-card tool-panel">
+            <summary><span>03</span><strong>MIDI DEBUG</strong><small>LOG / CC / PERFORMANCE INPUT</small></summary>
+            <div class="tool-panel-content">
             <p class="help">This is a browser-based web app, not custom firmware. It reads USB-MIDI from SEQTRAK in Chrome; it never sends MIDI or modifies the instrument.</p>
             <details class="midi-log"><summary>RECEIVED MESSAGE LOG</summary><button id="midiLogCopy" class="midi-log-copy" type="button" data-copy-target="midiReceiveLog" aria-label="Copy received MIDI log">COPY LOG</button><button id="midiLogClear" class="midi-log-clear" type="button" data-clear-target="midiReceiveLog" aria-label="Clear received MIDI log">CLEAR LOG</button><pre id="midiReceiveLog" aria-live="polite">No MIDI messages received.</pre></details>
             <h2 style="margin-top:20px">DOCUMENTED MIDI CC / PERFORMANCE DEMO</h2>
@@ -946,19 +1106,13 @@
             <div class="actions note-preview-actions"><button id="noteOnPreview" type="button">NOTE ON</button><button id="noteOffPreview" type="button">NOTE OFF</button></div>
             <p class="help">Recent MIDI note events only. Saved sequences are not read.</p>
             <pre id="eventLog" aria-live="polite">Ready. No hardware connected.</pre>
-          </section>
+            </div>
+          </details>
         </section>
-        <section class="project-statement" aria-label="Project concept">
-          <div>
-            <p class="statement-kicker">AN INDEPENDENT VISUAL COMPANION</p>
-            <h2>Keep your hands on the instrument.</h2>
-          </div>
-          <div>
-            <p class="statement-copy">Made for sound design, sequencing, and live performance, SEQTRAK Field Display brings sound, sequence, and performance state into quick view as you create or play live. The original instrument remains at the center, represented by a monochrome schematic alongside a 320 × 170 pixel preview of the external display.</p>
-            <a class="statement-link" href="#preview-controls">EXPLORE THE SIMULATOR</a>
-          </div>
+        <section class="project-statement compact" aria-label="Project concept">
+          <p><span>AN INDEPENDENT VISUAL COMPANION</span> Keep your hands on the instrument while sound, sequence, and performance state stay in view.</p>
         </section>
-        <p class="note">Drag or scroll the FX knob to cycle the documented 8-category effect presets. Hold a track knob while rotating FX to step through that track's sound presets; the selected sound name appears on the external display and in the sound preset control below. Click MASTER/SINGLE to change the effect target and use the simulator FX Page control below the hardware drawing to switch parameter assignments. Drag a touch strip to adjust its assigned value. On Page 1, HIGH PASS and REPEATER stay active only while pressed and bypass on release. Click the 16 Drum-section pads to toggle preview steps; they update the display and step grid below. Hold ALL while pressing Drum keys 1–6 to queue the same pattern for all 11 tracks; double-tap a Drum key while holding ALL to switch immediately. These hardware controls remain simulations and produce no audio. When you connect a MIDI input, this page receives messages only: documented CC values and Note activity can update the display, while Program Change and unknown SysEx are logged without guessed sound names or unverified decoding. Drum-section pads are sequence controls; Synth-section keys perform notes. The sounding Synth note depends on the selected track and its Scale, Key, and Octave settings, so this page's C4–B4 buttons simulate note events and do not claim a physical-key mapping. Recording, saved patterns, and unconfirmed hardware states are not inferred. DrumKit uses a neutral symbol when its active sound is unknown.</p>
+        <details class="operation-notes"><summary>OPERATION NOTES</summary><p class="note">Drag or scroll the FX knob to cycle the documented 8-category effect presets. Hold a track knob while rotating FX to step through that track's sound presets; the selected sound name appears on the external display and in the sound preset control below. Click MASTER/SINGLE to change the effect target and use the simulator FX Page control below the hardware drawing to switch parameter assignments. Drag a touch strip to adjust its assigned value. On Page 1, HIGH PASS and REPEATER stay active only while pressed and bypass on release. Click the 16 Drum-section pads to toggle preview steps; they update the display and step grid below. Hold ALL while pressing Drum keys 1–6 to queue the same pattern for all 11 tracks; double-tap a Drum key while holding ALL to switch immediately. These hardware controls remain simulations and produce no audio. When you connect a MIDI input, this page receives messages only: documented CC values and Note activity can update the display, while Program Change and unknown SysEx are logged without guessed sound names or unverified decoding. Drum-section pads are sequence controls; Synth-section keys perform notes. The sounding Synth note depends on the selected track and its Scale, Key, and Octave settings, so this page's C4–B4 buttons simulate note events and do not claim a physical-key mapping. Recording, saved patterns, and unconfirmed hardware states are not inferred. DrumKit uses a neutral symbol when its active sound is unknown.</p></details>
       </main>
     </div>
 
@@ -986,7 +1140,37 @@
         const synthHardwareKeys = document.getElementById("synthHardwareKeys");
         const familyButtons = document.getElementById("tracks");
         const trackKnobs = Array.from(document.querySelectorAll(".track-knob"));
-        const soundKnobOne = document.querySelector(".sound-knob[data-sound-knob='1']");
+        const soundKnobs = Array.from(document.querySelectorAll(".sound-knob"));
+        const soundIndexLights = Array.from(document.querySelectorAll(".sound-index-light"));
+        const soundKnobPositions = { 1: 0, 2: 0, 3: 0, 4: 0 };
+        const soundPageControl = document.getElementById("soundPageControl");
+        const soundDesignPages = {
+          drum: [
+            ["SOUND SELECT", "PITCH", "PAN", "VOLUME"],
+            ["AEG ATTACK", "AEG DECAY", "LP-HP FILTER CUTOFF", "LP-HP FILTER RESONANCE"],
+            ["REVERB SEND", "DELAY SEND", "EQ HIGH GAIN", "EQ LOW GAIN"]
+          ],
+          synth: [
+            ["SOUND SELECT", "MONO/POLY/CHORD", "PAN", "VOLUME"],
+            ["AEG ATTACK", "AEG DECAY/RELEASE", "LP-HP FILTER CUTOFF", "LP-HP FILTER RESONANCE"],
+            ["REVERB SEND", "DELAY SEND", "EQ HIGH GAIN", "EQ LOW GAIN"],
+            ["PORTAMENTO TIME", "ARPEGGIATOR TYPE", "ARPEGGIATOR GATE TIME", "ARPEGGIATOR SPEED"]
+          ],
+          dx: [
+            ["SOUND SELECT", "MONO/POLY/CHORD", "PAN", "VOLUME"],
+            ["AEG ATTACK", "AEG DECAY", "LP-HP FILTER CUTOFF", "LP-HP FILTER RESONANCE"],
+            ["REVERB SEND", "DELAY SEND", "EQ HIGH GAIN", "EQ LOW GAIN"],
+            ["PORTAMENTO TIME", "ARPEGGIATOR TYPE", "ARPEGGIATOR GATE TIME", "ARPEGGIATOR SPEED"],
+            ["FM ALGORITHM", "MODULATOR AMOUNT", "MODULATOR FREQUENCY", "MODULATOR FEEDBACK"]
+          ],
+          sampler: [
+            ["SOUND SELECT", "PITCH", "PAN", "VOLUME"],
+            ["AEG ATTACK", "AEG DECAY", "LP-HP FILTER CUTOFF", "LP-HP FILTER RESONANCE"],
+            ["REVERB SEND", "DELAY SEND", "EQ HIGH GAIN", "EQ LOW GAIN"],
+            ["START POINT", "END POINT", "LOOP ON/OFF", "LOOP LENGTH"],
+            ["PEG ATTACK LEVEL", "PEG ATTACK TIME", "PEG DECAY LEVEL", "PEG DECAY TIME"]
+          ]
+        };
         const fxKnob = document.getElementById("fxKnob");
         const fxModeControl = document.getElementById("fxModeControl");
         const fxPageControl = document.getElementById("fxPageControl");
@@ -997,6 +1181,7 @@
         const queuedPatterns = {};
         const soundIndexes = {};
         const soundValuesByChannel = {};
+        const soundDesignValuesByChannel = {};
         const drumSequences = {};
         const capturedDrumSequences = {};
         const capturedDrumKnown = {};
@@ -1018,6 +1203,7 @@
         let recording = false;
         let fxUnitMode = "Single";
         let fxUnitPage = 1;
+        let soundDesignPage = 1;
         let hardwareFxPresetIndex = 0;
         let heldSoundTrackChannel = null;
         let state = Model.createInitialState();
@@ -1722,6 +1908,7 @@
           updateTrackTypeOptions();
           syncMidiChannelSelection();
           makeState();
+          syncSoundDesignControls();
           if (notifyParent !== false && document.documentElement.dataset.embed === "hardware" && window.parent !== window) {
             const targetOrigin = window.location.protocol === "file:" ? "*" : window.location.origin;
             window.parent.postMessage({ type: "seqtrak-track-selected", channel: channel }, targetOrigin);
@@ -2007,7 +2194,7 @@
           const needleFraction = list.length > 1 ? hardwareFxPresetIndex / (list.length - 1) : 0;
           document.getElementById("fxKnobIndicator").setAttribute("transform", "rotate(" + (-135 + needleFraction * 270) + " 1027 82)");
           fxModeControl.setAttribute("aria-checked", String(fxUnitMode === "Master"));
-          document.getElementById("fxModeThumb").setAttribute("cx", fxUnitMode === "Master" ? "1001" : "1053");
+          document.getElementById("fxModeThumb").setAttribute("cx", fxUnitMode === "Master" ? "1009" : "1045");
           fxPageControl.setAttribute("aria-pressed", String(fxUnitPage === 2));
           fxPageControl.setAttribute("aria-label", "Simulator FX Page control. Current page " + fxUnitPage + ". Press to switch pages.");
           fxPageControl.textContent = "SIM PAGE " + fxUnitPage;
@@ -2451,7 +2638,7 @@
             state.presets = [];
             state.preset = null;
             state.selectedIndex = -1;
-            state.view = "overview";
+            state.view = "sound";
             state.until = 0;
             focusPlaybackDetail("overview");
             syncSoundControls();
@@ -2719,7 +2906,107 @@
           });
         }
 
+        function soundDesignFamily() {
+          if (channel === 10 || trackType === "DX") return "dx";
+          if (channel === 11 || trackType === "Sampler") return "sampler";
+          if (trackType === "Synth") return "synth";
+          return "drum";
+        }
+
+        function soundDesignAssignments() {
+          const pages = soundDesignPages[soundDesignFamily()];
+          soundDesignPage = Math.max(1, Math.min(soundDesignPage, pages.length));
+          return pages[soundDesignPage - 1];
+        }
+
+        function soundParameterDefinition(name) {
+          const key = name.toLowerCase().replace(/[^a-z0-9]+(.)/g, function (_match, letter) { return letter ? letter.toUpperCase() : ""; });
+          const ranges = {
+            pitch: [-24, 24], pan: [1, 127], volume: [0, 127], monoPolyChord: [0, 2],
+            loopOnOff: [0, 1], fmAlgorithm: [0, 11], arpeggiatorType: [0, 16],
+            arpeggiatorSpeed: [0, 9], eqHighGain: [40, 88], eqLowGain: [40, 88]
+          };
+          const range = ranges[key] || [0, 127];
+          return { key: key, name: name, min: range[0], max: range[1] };
+        }
+
+        function indexLabelsForSoundParameter(name) {
+          if (name === "SOUND SELECT") return ["SOUND"];
+          if (name === "MONO/POLY/CHORD") return ["MONO/POLY", "CHORD"];
+          if (name === "AEG ATTACK") return ["ATTACK"];
+          if (name === "AEG DECAY" || name === "AEG DECAY/RELEASE") return ["DECAY"];
+          if (name === "LP-HP FILTER CUTOFF") return ["FILTER"];
+          if (name === "LP-HP FILTER RESONANCE") return ["RESONANCE"];
+          if (name === "REVERB SEND") return ["REVERB"];
+          if (name === "DELAY SEND") return ["DELAY"];
+          if (["PITCH", "PAN", "VOLUME"].includes(name)) return [name];
+          return ["OTHER"];
+        }
+
+        function syncSoundIndexLights(activeParameter) {
+          const assignedLabels = new Set(soundDesignAssignments().flatMap(indexLabelsForSoundParameter));
+          const activeLabels = new Set(activeParameter ? indexLabelsForSoundParameter(activeParameter) : []);
+          soundIndexLights.forEach(function (light) {
+            const label = light.dataset.indexLabel;
+            light.classList.toggle("page-assigned", assignedLabels.has(label));
+            light.classList.toggle("active", activeLabels.has(label));
+          });
+        }
+
+        function syncSoundDesignControls() {
+          const pages = soundDesignPages[soundDesignFamily()];
+          if (soundDesignPage > pages.length) soundDesignPage = pages.length;
+          const assignments = soundDesignAssignments();
+          soundPageControl.setAttribute("aria-label", "Sound Design page. Current page " + soundDesignPage + " of " + pages.length + ". Press to change page.");
+          document.getElementById("soundUnitPageReadout").textContent = "SOUND DESIGN · PAGE " + soundDesignPage + "/" + pages.length + " · " + assignments.join(" / ");
+          soundKnobs.forEach(function (knob, index) {
+            knob.setAttribute("aria-label", "Sound Design knob " + (index + 1) + " · " + assignments[index]);
+          });
+          syncSoundIndexLights(null);
+        }
+
+        function toggleSoundDesignPage() {
+          const pages = soundDesignPages[soundDesignFamily()];
+          soundDesignPage = soundDesignPage % pages.length + 1;
+          syncSoundDesignControls();
+          stateReadout.textContent = "SOUND DESIGN · PAGE " + soundDesignPage + " · " + soundDesignAssignments().join(" / ");
+        }
+
+        function rotateSoundDesignKnob(knobNumber, direction) {
+          const number = Number(knobNumber);
+          soundKnobPositions[number] = Math.max(-12, Math.min(12, Number(soundKnobPositions[number] || 0) + direction));
+          const centers = { 1: [895, 75], 2: [895, 132], 3: [895, 189], 4: [895, 246] };
+          const indicator = document.getElementById("soundKnobIndicator" + number);
+          if (indicator && centers[number]) {
+            indicator.setAttribute("transform", "rotate(" + (soundKnobPositions[number] * 11.25) + " " + centers[number][0] + " " + centers[number][1] + ")");
+          }
+          const parameterName = soundDesignAssignments()[number - 1];
+          syncSoundIndexLights(parameterName);
+          if (parameterName === "SOUND SELECT") {
+            rotateSound(direction);
+          } else {
+            const definition = soundParameterDefinition(parameterName);
+            if (!soundDesignValuesByChannel[channel]) soundDesignValuesByChannel[channel] = {};
+            const values = soundDesignValuesByChannel[channel];
+            const fallback = Math.round((definition.min + definition.max) / 2);
+            const next = Math.max(definition.min, Math.min(definition.max, Number.isFinite(values[definition.key]) ? values[definition.key] + direction : fallback + direction));
+            values[definition.key] = next;
+            state.currentParameter = Object.assign({}, definition, { value: next });
+            state.view = "parameter";
+            state.until = 0;
+            state.playbackFocus = true;
+            state.playbackOverview = false;
+            if (Object.prototype.hasOwnProperty.call(state.values, definition.key)) state.values[definition.key] = next;
+            if (["cutoff", "resonance", "decay"].includes(definition.key)) {
+              document.getElementById(definition.key).value = String(next);
+              document.getElementById(definition.key + "Val").textContent = String(next);
+            }
+            stateReadout.textContent = "SOUND DESIGN · PAGE " + soundDesignPage + " · KNOB " + number + " · " + parameterName + " " + next + " · SIMULATED";
+          }
+        }
+
         function attachSoundKnob(knob) {
+          const knobNumber = Number(knob.dataset.soundKnob);
           let drag = null;
           knob.addEventListener("pointerdown", function (event) {
             event.preventDefault();
@@ -2730,20 +3017,20 @@
             if (!drag || drag.pointerId !== event.pointerId) return;
             drag.remainder += drag.lastY - event.clientY;
             drag.lastY = event.clientY;
-            while (drag.remainder >= 14) { rotateSound(1); drag.remainder -= 14; }
-            while (drag.remainder <= -14) { rotateSound(-1); drag.remainder += 14; }
+            while (drag.remainder >= 14) { rotateSoundDesignKnob(knobNumber, 1); drag.remainder -= 14; }
+            while (drag.remainder <= -14) { rotateSoundDesignKnob(knobNumber, -1); drag.remainder += 14; }
           });
           function finishDrag() { drag = null; }
           knob.addEventListener("pointerup", finishDrag);
           knob.addEventListener("pointercancel", finishDrag);
           knob.addEventListener("wheel", function (event) {
             event.preventDefault();
-            rotateSound(event.deltaY < 0 ? 1 : -1);
+            rotateSoundDesignKnob(knobNumber, event.deltaY < 0 ? 1 : -1);
           }, { passive: false });
           knob.addEventListener("keydown", function (event) {
             if (event.key === "ArrowUp" || event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "ArrowLeft") {
               event.preventDefault();
-              rotateSound(event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1);
+              rotateSoundDesignKnob(knobNumber, event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1);
             }
           });
         }
@@ -2770,7 +3057,14 @@
         });
 
         trackKnobs.forEach(attachTrackKnob);
-        attachSoundKnob(soundKnobOne);
+        soundKnobs.forEach(attachSoundKnob);
+        soundPageControl.addEventListener("click", toggleSoundDesignPage);
+        soundPageControl.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleSoundDesignPage();
+          }
+        });
 
         const pitchClasses = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
         pitchClasses.forEach(function (pitchClass, offset) {
@@ -2973,6 +3267,7 @@
         syncThemeControl();
         refreshRecordingControl();
         makeState();
+        syncSoundDesignControls();
         syncFxOptions(null, null);
         selectHardwareFxPreset(0);
         if (document.documentElement.dataset.embed === "hardware" && window.parent !== window) {
