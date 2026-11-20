@@ -3,7 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script>if (new URLSearchParams(window.location.search).get("embed") === "hardware") document.documentElement.dataset.embed = "hardware";</script>
+    <script>
+      const embeddedView = new URLSearchParams(window.location.search).get("embed");
+      if (embeddedView === "hardware" || embeddedView === "display") document.documentElement.dataset.embed = embeddedView;
+    </script>
     <title>FIELD / 01 · Visual companion for SEQTRAK</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -81,10 +84,21 @@
       }
       .display-unit { width: 100%; max-width: 330px; margin: 0 auto; }
       .unit-label { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 9px; color: var(--muted); font: 10px var(--mono); letter-spacing: .1em; }
+      .unit-label-title { display: inline-flex; align-items: baseline; gap: 10px; }
+      .unit-label-actions { display: inline-flex; align-items: center; gap: 10px; }
+      .display-demo-link { color: var(--muted); font-size: 8px; letter-spacing: .06em; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+      .display-demo-link:hover { color: var(--text); }
+      .display-popout { display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center; color: currentColor; text-decoration: none; }
+      .display-popout:hover { color: var(--accent); }
+      .display-popout:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+      .display-popout svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-linecap: square; stroke-linejoin: miter; stroke-width: 1.5; }
       .bezel { padding: 12px; border: 1px solid #555b60; border-radius: 12px; background: linear-gradient(145deg, #363a3e, #151719 72%); box-shadow: none; }
       .screen { overflow: hidden; width: 100%; border: 1px solid #08090a; border-radius: 3px; background: #080a0c; }
       #display { display: block; width: 100%; height: auto; aspect-ratio: 320 / 170; }
       .bezel-mark { display: flex; justify-content: space-between; margin: 9px 1px 0; color: #a2a7ab; font: 9px var(--mono); letter-spacing: .12em; }
+      .display-unit .bezel { padding: 0; border: 0; background: transparent; }
+      .display-unit .screen { border: 0; background: transparent; }
+      .display-unit .bezel-mark { display: none; }
       .device-wrap { min-width: 0; }
       .device-caption { display: flex; justify-content: space-between; gap: 12px; margin: 0 2px 9px; color: var(--muted); font: 10px var(--mono); letter-spacing: .1em; }
       .device-svg { display: block; width: 100%; height: auto; filter: none; }
@@ -216,6 +230,18 @@
         .state-readout { grid-column: auto; }
         .demo-suite { grid-template-columns: 1fr; }
       }
+
+      :root[data-embed="display"] body { min-width: 320px; background: #20231f; }
+      :root[data-embed="display"] .page { width: 100%; max-width: none; margin: 0; padding: clamp(10px, 2vw, 24px); }
+      :root[data-embed="display"] .page > header { display: none !important; }
+      :root[data-embed="display"] main > *:not(#hardware-view) { display: none !important; }
+      :root[data-embed="display"] #hardware-view { display: block; min-height: 0; margin: 0; padding: 0; background: transparent; }
+      :root[data-embed="display"] .display-unit { width: min(100%, 960px); max-width: none; margin: 0 auto; }
+      :root[data-embed="display"] .unit-label,
+      :root[data-embed="display"] .device-wrap,
+      :root[data-embed="display"] .fx-unit-readout { display: none !important; }
+      :root[data-embed="display"] .bezel { padding: 0; border: 0; background: transparent; }
+      :root[data-embed="display"] .bezel-mark { margin-top: clamp(8px, 1vw, 14px); }
 
       /* Editorial, instrument-led visual treatment. Control behavior remains unchanged. */
       :root {
@@ -775,6 +801,25 @@
         .header-detail { margin-top: 4px; }
         #hardware-view { margin-inline: -18px; padding-inline: 18px; }
       }
+      .display-unit .bezel,
+      :root[data-embed="display"] .display-unit .bezel {
+        padding: 8px;
+        border: 1px solid #4b504a;
+        background: #20231f;
+      }
+      .display-unit .screen {
+        border: 1px solid #0c0e0d;
+        background: #080a0c;
+      }
+      :root[data-theme="light"] .display-unit .bezel,
+      :root[data-theme="light"][data-embed="display"] .display-unit .bezel {
+        border-color: #b8b5ac;
+        background: #deddd6;
+      }
+      :root[data-theme="light"] .display-unit .screen {
+        border-color: #c4c9c5;
+        background: #f5f7f5;
+      }
     </style>
     <style>
       :root[data-embed="hardware"] body { min-width: 320px; }
@@ -835,7 +880,15 @@
       <main>
         <section id="hardware-view" class="scene" aria-label="SEQTRAK and external display front view">
           <div class="display-unit">
-            <div class="unit-label"><span>FIELD DISPLAY</span><span>320 × 170</span></div>
+            <div class="unit-label">
+              <span class="unit-label-title">FIELD DISPLAY <a class="display-demo-link" href="display-640-parameter-compare.html">640 × 172 DEMO</a></span>
+              <span class="unit-label-actions">
+                <span>320 × 170</span>
+                <a id="displayPopout" class="display-popout" href="index.html?embed=display" target="_blank" rel="noopener" aria-label="Open FIELD DISPLAY in a new window" title="Open FIELD DISPLAY in a new window">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3H3v10h10v-3M8 3h5v5M13 3 7 9"/></svg>
+                </a>
+              </span>
+            </div>
             <div class="bezel">
               <div class="screen"><canvas id="display" width="1280" height="680" aria-label="320 by 170 display preview"></canvas></div>
               <div class="bezel-mark"><span aria-hidden="true"></span><span>FIELD / 01</span></div>
@@ -1131,6 +1184,7 @@
         const typeSelect = document.getElementById("trackType");
         const stateReadout = document.getElementById("stateReadout");
         const themeToggle = document.getElementById("themeToggle");
+        const displayPopoutControl = document.getElementById("displayPopout");
         const recordToggle = document.getElementById("recordToggle");
         const noteKeys = document.getElementById("noteKeys");
         const drumSequenceControl = document.getElementById("drumSequenceControl");
@@ -1186,6 +1240,8 @@
         const capturedDrumSequences = {};
         const capturedDrumKnown = {};
         let theme = "light";
+        let displayPopoutWindow = null;
+        let lastDisplayPopoutSync = 0;
         let channel = 1;
         let trackType = "Drum";
         let allPatternMode = false;
@@ -1206,7 +1262,7 @@
         let soundDesignPage = 1;
         let hardwareFxPresetIndex = 0;
         let heldSoundTrackChannel = null;
-        let state = Model.createInitialState();
+        let state = Object.assign({}, Model.createInitialState(), { bpm: 120, bpmSource: "preview" });
         state.playing = false;
         let previewMasterVolume = 64;
         let playheadStep = null;
@@ -1292,6 +1348,7 @@
 
         function setAllPatternMode(enabled) {
           allPatternMode = Boolean(enabled);
+          state = Object.assign({}, state, { allView: allPatternMode });
           syncTrackSelection();
           syncHardwareDrumPads();
           if (allPatternMode) {
@@ -1305,7 +1362,10 @@
 
         function setMuteMode(enabled) {
           muteMode = Boolean(enabled);
-          if (muteMode) allPatternMode = false;
+          if (muteMode) {
+            allPatternMode = false;
+            state = Object.assign({}, state, { allView: false });
+          }
           syncTrackSelection();
           syncSideButtonState("mute");
           stateReadout.textContent = muteMode
@@ -1348,7 +1408,13 @@
               max: 127
             },
             view: "parameter",
-            until: performance.now() + 2400
+            until: performance.now() + 2400,
+            sideFeedback: {
+              type: "volume",
+              label: "MASTER VOLUME",
+              value: previewMasterVolume,
+              until: performance.now() + 1400
+            }
           });
           setSideActionReadout("volume", "MASTER VOL " + previewMasterVolume + " · PREVIEW ONLY");
         }
@@ -1398,7 +1464,17 @@
             setSideActionReadout(muteByChannel[target] ? "mic-off" : "mic", "CH " + String(target).padStart(2, "0") + (muteByChannel[target] ? " · MUTED" : " · UNMUTED") + (muteMode ? " · MUTE MODE" : ""));
           } else if (action === "solo") {
             const soloTrack = state.soloTrack === target ? null : target;
-            state = Object.assign({}, state, { soloTrack: soloTrack, view: "overview", until: 0 });
+            state = Object.assign({}, state, {
+              soloTrack: soloTrack,
+              view: "overview",
+              until: 0,
+              sideFeedback: {
+                type: "solo",
+                label: soloTrack === null ? "SOLO OFF" : "SOLO TRACK",
+                value: soloTrack === null ? "--" : String(soloTrack).padStart(2, "0"),
+                until: performance.now() + 1400
+              }
+            });
             syncPreviewControls();
             stateReadout.textContent = soloTrack === null ? "SOLO OFF" : "SOLO TRACK " + target;
             clearSideLatch("solo");
@@ -1440,14 +1516,24 @@
           if (action === "play") {
             setSequencePlaying(!state.playing);
           } else if (action === "bpm-up" || action === "bpm-down") {
-            if (state.bpm === null) stateReadout.textContent = "BPM UNKNOWN · SET A PREVIEW BPM BEFORE USING BPM + / −";
-            else applyBpm(state.bpm + (action === "bpm-up" ? 1 : -1), "preview");
+            const baseBpm = state.bpm === null ? 120 : Number(state.bpm);
+            applyBpm(baseBpm + (action === "bpm-up" ? 1 : -1), "preview");
           } else if (action === "volume-up" || action === "volume-down") {
             adjustPreviewMasterVolume(action === "volume-up" ? 1 : -1);
           } else if (action === "mute") {
             setMuteMode(!muteMode);
           } else if (action === "solo") {
             soloButtonLatched = !soloButtonLatched;
+            state = Object.assign({}, state, {
+              view: "overview",
+              until: 0,
+              sideFeedback: {
+                type: "solo",
+                label: soloButtonLatched ? "SOLO READY" : "SOLO CANCELLED",
+                value: soloButtonLatched ? "SELECT A TRACK" : "--",
+                until: performance.now() + 1400
+              }
+            });
             syncSideButtonState("solo");
             stateReadout.textContent = soloButtonLatched ? "SOLO READY · TAP A TRACK KNOB" : "SOLO CANCELLED";
           } else if (action === "delete") {
@@ -1865,6 +1951,7 @@
             && Array.isArray(capturedDrumKnown[channel]) && capturedDrumKnown[channel].some(Boolean);
           state = Object.assign({}, Model.createInitialState(), {
             language: "en",
+            displayMode: "alpha2",
             theme: theme,
             source: familyOverride ? "demo" : "midi",
             deviceTrack: { name: displayName, channel: channel, family: familyId, type: trackType },
@@ -1888,8 +1975,11 @@
             fx: previous.fx,
             masterVolumeDisplay: previous.masterVolumeDisplay,
             volumeByChannel: previous.volumeByChannel,
+            parameterValuesByChannel: previous.parameterValuesByChannel,
             muteByChannel: previous.muteByChannel,
             soloTrack: previous.soloTrack,
+            allView: Boolean(previous.allView),
+            sideFeedback: null,
             recording: recording,
             drumPattern: trackType === "Drum" && channel <= 7
               ? (hasCapturedDrumEdits ? capturedDrumSequenceFor(channel).slice() : drumSequenceFor(channel).slice()) : null,
@@ -2275,7 +2365,7 @@
           });
           syncFxParameterOptions(1);
           state.view = "effect";
-          state.until = 0;
+          state.until = performance.now() + 2400;
           updateFxHint();
           syncFxUnitControls();
           return true;
@@ -2304,9 +2394,9 @@
           fxUnitPage = fxUnitPage === 1 ? 2 : 1;
           const mapping = currentFxStripMapping("fxLevel");
           if (mapping && mapping.kind === "effectParameter" && state.fx.effect) syncFxParameterOptions(mapping.number);
-          state.fx = Object.assign({}, state.fx, { performance: null });
+          state.fx = Object.assign({}, state.fx, { performance: null, page: fxUnitPage });
           state.view = "effect";
-          state.until = 0;
+          state.until = performance.now() + 2400;
           syncFxUnitControls();
         }
 
@@ -2539,6 +2629,7 @@
           state.view = "overview";
           state.until = 0;
           syncPerformanceControls();
+          stateReadout.textContent = "BPM " + value + " · PREVIEW";
           eventLog.textContent = JSON.stringify({ source: state.bpmSource, bpm: value }, null, 2);
           return true;
         }
@@ -2992,6 +3083,9 @@
             const next = Math.max(definition.min, Math.min(definition.max, Number.isFinite(values[definition.key]) ? values[definition.key] + direction : fallback + direction));
             values[definition.key] = next;
             state.currentParameter = Object.assign({}, definition, { value: next });
+            const parameterValuesByChannel = Object.assign({}, state.parameterValuesByChannel);
+            parameterValuesByChannel[channel] = Object.assign({}, parameterValuesByChannel[channel], { [definition.key]: next });
+            state.parameterValuesByChannel = parameterValuesByChannel;
             state.view = "parameter";
             state.until = 0;
             state.playbackFocus = true;
@@ -3111,6 +3205,13 @@
           state.theme = theme;
         });
 
+        if (displayPopoutControl) {
+          displayPopoutControl.addEventListener("click", function (event) {
+            event.preventDefault();
+            displayPopoutWindow = window.open(displayPopoutControl.href, "seqtrak-field-display", "popup,width=960,height=560");
+          });
+        }
+
         document.getElementById("preset").addEventListener("change", function (event) {
           const index = Number(event.target.value);
           delete soundValuesByChannel[channel];
@@ -3126,6 +3227,9 @@
           document.getElementById(key).addEventListener("input", function (event) {
             state = Model.setSoundParameter(state, key, Number(event.target.value), performance.now(), Model.SOUND_CONTROLLERS[controller]);
             state.theme = theme;
+            const parameterValuesByChannel = Object.assign({}, state.parameterValuesByChannel);
+            parameterValuesByChannel[channel] = Object.assign({}, parameterValuesByChannel[channel], { [key]: Number(event.target.value) });
+            state.parameterValuesByChannel = parameterValuesByChannel;
             document.getElementById(key + "Val").textContent = event.target.value;
           });
         });
@@ -3283,6 +3387,17 @@
             if (Number.isInteger(nextChannel) && Model.MIDI_TRACKS[nextChannel]) chooseChannel(nextChannel);
           });
         }
+        if (document.documentElement.dataset.embed === "display" && window.opener) {
+          window.addEventListener("message", function (event) {
+            if (event.source !== window.opener || !event.data || event.data.type !== "seqtrak-display-state") return;
+            state = Object.assign({}, state, event.data.state || {}, { presets: state.presets });
+            if (event.data.theme === "light" || event.data.theme === "dark") {
+              theme = event.data.theme;
+              state.theme = theme;
+              syncThemeControl();
+            }
+          });
+        }
 
         function draw(time) {
           if (state.playbackOverview && !state.playing
@@ -3295,6 +3410,16 @@
           }
           advanceSequence(time);
           Renderer.render(ctx, state, time, FxModel);
+          if (displayPopoutWindow && !displayPopoutWindow.closed && Number(time) - lastDisplayPopoutSync >= 100) {
+            const popoutState = Object.assign({}, state);
+            delete popoutState.presets;
+            try {
+              displayPopoutWindow.postMessage({ type: "seqtrak-display-state", state: popoutState, theme: theme }, "*");
+              lastDisplayPopoutSync = Number(time);
+            } catch (error) {
+              displayPopoutWindow = null;
+            }
+          }
           window.requestAnimationFrame(draw);
         }
         window.requestAnimationFrame(draw);
