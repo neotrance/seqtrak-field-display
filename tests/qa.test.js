@@ -680,7 +680,12 @@ test("hardware preview simulates FX controls and 16 physical drum sequence pads"
   assert.match(html, /id="fxStripLabelLevel" x="1027"/);
   assert.match(html, /id="fxStripLabelHighPass" x="1127"/);
   assert.match(html, /id="fxStripLabelRepeater" x="1247"/);
-  assert.match(html, /class="fx-mode-track" x="991" y="168" width="72"/);
+  assert.match(html, /class="fx-mode-track" x="1000" y="168" width="54"/);
+  [1, 2, 3, 4].forEach(function (number) {
+    assert.match(html, new RegExp('class="sound-knob" data-sound-knob="' + number + '"[^>]*role="button"'));
+    assert.match(html, new RegExp('id="soundKnobIndicator' + number + '"'));
+  });
+  assert.match(html, /soundKnobs\.forEach\(attachSoundKnob\)/);
   ["sideVolumeUp", "sideVolumeDown", "sideDelete", "sideMute", "sideSolo", "sidePage", "sidePlay", "sideBpmUp", "sideBpmDown", "sideSwing", "sideProject"].forEach(function (id) {
     assert.match(html, new RegExp("id=\\\"" + id + "\\\" class=\\\"hardware-side-control\\\""));
   });
@@ -692,8 +697,8 @@ test("hardware preview simulates FX controls and 16 physical drum sequence pads"
     const match = html.match(new RegExp("id=\\\"" + id + "\\\"[^>]* y=\\\"(\\d+)\\\""));
     return match && match[1];
   });
-  assert.deepEqual(leftButtonYs, ["38", "78", "118", "158", "198", "238", "278"]);
-  assert.deepEqual(rightButtonYs, ["172", "212", "252", "292"]);
+  assert.deepEqual(leftButtonYs, ["38", "88", "138", "188", "238", "288", "338"]);
+  assert.deepEqual(rightButtonYs, ["205", "249", "293", "337"]);
   assert.match(html, /BPM \+/);
   assert.match(html, /BPM −/);
   assert.match(html, /Hold ALL while pressing Drum keys 1–6/);
@@ -752,6 +757,84 @@ test("light theme renders a light display canvas", function () {
 
   renderer.render(context, Object.assign({}, stateModel.createInitialState(), { theme: "light" }), 100, fxModel);
   assert.ok(fills.includes("#F5F7F5"));
+});
+
+test("Alpha 2 display integrates selected-track and ALL parameter views", function () {
+  const texts = [];
+  const context = new Proxy({}, {
+    get: function (target, property) {
+      if (property === "fillText") return function (value) { texts.push(String(value)); };
+      if (property in target) return target[property];
+      return function () {};
+    },
+    set: function (target, property, value) { target[property] = value; return true; }
+  });
+  const kick = catalog.tracks.find(function (track) { return track.id === "kick"; });
+  const state = Object.assign({}, stateModel.createInitialState(), {
+    displayMode: "alpha2",
+    source: "midi",
+    track: kick,
+    deviceTrack: { name: "KICK / DRUM", channel: 1, family: "kick", type: "Drum" },
+    preset: { name: "Tight Kick 03", category: "Kick", number: "3", engine: "Drum" },
+    drumPattern: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
+    drumPatternNumber: 1,
+    parameterValuesByChannel: { 1: { volume: 84 } }
+  });
+  renderer.render(context, state, 100, fxModel);
+  assert.ok(texts.includes("SELECTED SOUND"));
+  assert.ok(texts.includes("KICK / DRUM"));
+  assert.ok(texts.includes("Tight Kick 03"));
+  assert.ok(texts.includes("PATTERN 01 · 16 STEPS"));
+  assert.match(renderer.phosphorHeaderPaths.waveform, /^M56,96/);
+  assert.deepEqual(renderer.phosphorHeaderIconNames, {
+    KICK: "waveform", SNARE: "circle", CLAP: "hands-clapping",
+    "HAT 1": "bell-simple", "HAT 2": "bell-simple",
+    "PERC 1": "music-notes", "PERC 2": "music-notes",
+    "SYNTH 1": "piano-keys", "SYNTH 2": "piano-keys",
+    DX: "wave-sine", SAMPLER: "microphone"
+  });
+
+  texts.length = 0;
+  renderer.render(context, Object.assign({}, state, {
+    playbackOverview: true,
+    view: "effect",
+    fx: {
+      scope: "Single",
+      effect: { name: "TEST DELAY", category: "DELAY" },
+      parameter: { name: "DELAY TIME", number: 1 },
+      parameterValue: 64,
+      visualIntensity: 64,
+      page: 2,
+      controlChange: null,
+      performance: null
+    }
+  }), 100, fxModel);
+  assert.ok(texts.includes("TEST DELAY"));
+  assert.ok(texts.includes("PAGE 2 · CURRENT EFFECT"));
+  assert.equal(texts.includes("CHANNEL ACTIVITY"), false);
+
+  texts.length = 0;
+  renderer.render(context, Object.assign({}, state, {
+    view: "overview",
+    sideFeedback: { type: "volume", label: "MASTER VOLUME", value: 65, until: 1500 }
+  }), 100, fxModel);
+  assert.ok(texts.includes("MASTER VOLUME"));
+  assert.ok(texts.includes("65"));
+
+  texts.length = 0;
+  renderer.render(context, Object.assign({}, state, {
+    view: "overview",
+    sideFeedback: { type: "solo", label: "SOLO READY", value: "SELECT A TRACK", until: 1500 }
+  }), 100, fxModel);
+  assert.ok(texts.includes("SOLO READY"));
+  assert.ok(texts.includes("SELECT A TRACK"));
+
+  texts.length = 0;
+  renderer.render(context, Object.assign({}, state, { allView: true, currentParameter: { key: "volume", name: "TRACK VOLUME", value: 84, min: 0, max: 127 } }), 100, fxModel);
+  assert.ok(texts.includes("ALL"));
+  assert.ok(texts.includes("KICK"));
+  assert.ok(texts.includes("84"));
+  assert.ok(texts.includes("--"));
 });
 
 test("drum overview and parameter view show only explicit 16-step data with decay", function () {
@@ -883,6 +966,7 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
     "cutoff", "cutoffVal", "resonance", "resonanceVal", "decay", "decayVal", "play", "next", "fxScope", "fxCategory", "fxType",
     "fxParameter", "fxParamValue", "fxParamValueLabel", "fxParamMeta", "fxVisualIntensity", "fxVisualIntensityVal", "fxVisualHint",
     "fxKnob", "fxKnobIndicator", "fxModeControl", "fxModeThumb", "fxPageControl", "fxUnitPresetReadout", "fxUnitPageReadout",
+    "soundPageControl", "soundUnitPageReadout",
     "fxStripLevel", "fxStripHighPass", "fxStripRepeater",
     "midiChannel", "midiController", "midiValue", "midiValueLabel", "applyMidiEvent", "bpmPreview", "setBpmPreview", "bpmDownPreview",
     "bpmUpPreview", "noteNumber", "noteVelocity", "noteOnPreview", "noteOffPreview", "eventLog", "sysexAddress", "sysexValue",
@@ -905,7 +989,11 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
   const knobs = ["all", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(function (value) {
     const knob = makeElement("", "G"); knob.dataset.channel = String(value); return knob;
   });
-  const soundKnob = makeElement("", "G");
+  const soundKnobs = [1, 2, 3, 4].map(function (number) {
+    const knob = makeElement("", "G");
+    knob.dataset.soundKnob = String(number);
+    return knob;
+  });
   const hardwareSideControls = ["volume-up", "volume-down", "delete", "mute", "solo", "page", "play", "bpm-up", "bpm-down", "swing", "project"].map(function (action) {
     const control = makeElement("", "RECT");
     control.dataset.sideAction = action;
@@ -918,13 +1006,14 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
     createElementNS: function (_ns, tag) { return makeElement("", tag.toUpperCase()); },
     querySelectorAll: function (selector) {
       if (selector === ".track-knob") return knobs;
-      if (selector === ".sound-knob[data-sound-knob='1']") return [soundKnob];
+      if (selector === ".sound-knob") return soundKnobs;
+      if (selector === ".sound-index-light") return [];
       if (selector === ".hardware-side-control") return hardwareSideControls;
       if (selector === ".fx-test") return fxTests;
       if (selector === ".fx-touch-strip") return fxStripControls;
       return [];
     },
-    querySelector: function (selector) { return selector === ".sound-knob[data-sound-knob='1']" ? soundKnob : null; },
+    querySelector: function () { return null; },
     documentElement: { attributes: {}, dataset: {}, setAttribute: function (name, value) { this.attributes[name] = String(value); } }
   };
   const midiReceiverStub = { connect: async function () {}, selectInput: async function () {}, disconnect: async function () {} };
@@ -973,11 +1062,17 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
   assert.equal(elements.get("drumSteps").children.length, 16);
   assert.ok(textDrawn.includes("PATTERN 01 · 16 STEPS"));
   const sidePlay = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "play"; });
+  const sideBpmUp = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "bpm-up"; });
+  const sideBpmDown = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "bpm-down"; });
+  sideBpmUp.dispatch("click");
+  assert.equal(elements.get("bpmPreview").value, "121");
+  assert.match(elements.get("stateReadout").textContent, /BPM 121 · PREVIEW/);
+  sideBpmDown.dispatch("click");
+  assert.equal(elements.get("bpmPreview").value, "120");
   assert.equal(sidePlay.attributes["aria-pressed"], "false");
   sidePlay.dispatch("click");
   assert.equal(sidePlay.attributes["aria-pressed"], "true");
   assert.match(elements.get("stateReadout").textContent, /PREVIEW 120 BPM/);
-  const sideBpmUp = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "bpm-up"; });
   sideBpmUp.dispatch("click");
   assert.equal(elements.get("bpmPreview").value, "121");
   const sideVolumeUp = hardwareSideControls.find(function (control) { return control.dataset.sideAction === "volume-up"; });
@@ -1143,7 +1238,7 @@ test("hardware preview boots its sound, FX, MIDI, BPM, and note controls", funct
   textDrawn.length = 0;
   renderAt(5000);
   assert.ok(textDrawn.includes("PATTERN 03 · 16 STEPS"));
-  assert.equal(textDrawn.includes("FILTER CUTOFF"), false);
+  assert.equal(textDrawn.includes("FILTER CUTOFF"), true);
 
   elements.get("fxType").dispatch("change");
   textDrawn.length = 0;
@@ -1184,6 +1279,13 @@ test("hardware Sound Design selector matches the photographed parameter order", 
     "SOUND", "PITCH", "MONO/POLY", "CHORD", "PAN", "VOLUME", "ATTACK", "DECAY", "MICRO TIMING", "FILTER",
     "RESONANCE", "REVERB", "DELAY", "COMP", "DISTORTION", "MODULATION", "DUCKER", "OTHER", "MIXER", "SONG"
   ]);
+  assert.match(html, /id="soundPageControl"[^>]*role="button"/);
+  assert.equal((html.match(/class="sound-index-light"/g) || []).length, 18);
+  assert.match(html, /drum:\s*\[\s*\["SOUND SELECT", "PITCH", "PAN", "VOLUME"\]/);
+  assert.match(html, /synth:\s*\[[\s\S]*?"PORTAMENTO TIME", "ARPEGGIATOR TYPE", "ARPEGGIATOR GATE TIME", "ARPEGGIATOR SPEED"/);
+  assert.match(html, /dx:\s*\[[\s\S]*?"FM ALGORITHM", "MODULATOR AMOUNT", "MODULATOR FREQUENCY", "MODULATOR FEEDBACK"/);
+  assert.match(html, /sampler:\s*\[[\s\S]*?"START POINT", "END POINT", "LOOP ON\/OFF", "LOOP LENGTH"/);
+  assert.match(html, /syncSoundIndexLights\(parameterName\)/);
 });
 
 test("FX selector and FX Level column are widened with separate adjacent strips", function () {
@@ -1408,4 +1510,14 @@ test("browser controller boots, applies CC events, and keeps the legacy adapter 
   const legacy = sandbox.seqtrakFxTypeEvent("30 43 00", "01 02");
   assert.equal(legacy.known, true);
   assert.equal(legacy.protocolVerifiedAgainstUserGuide, false);
+});
+
+test("FIELD DISPLAY opens as a synchronized display-only popout", function () {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  assert.match(html, /id="displayPopout"[\s\S]*?href="index\.html\?embed=display"/);
+  assert.match(html, /data-embed="display"/);
+  assert.match(html, /main > \*:not\(#hardware-view\)/);
+  assert.match(html, /seqtrak-display-state/);
+  assert.match(html, /event\.source !== window\.opener/);
+  assert.match(html, /delete popoutState\.presets/);
 });
