@@ -68,6 +68,8 @@ Without a connected device, the simulator continues to work as a standalone visu
 - [`live-monitor.html`](live-monitor.html) — Receive-only performance monitor
 - [`display-preview.html`](display-preview.html) — Original display preview
 - [`hardware-preview.html`](hardware-preview.html) — Compatibility entry point
+- [`display-640-parameter-compare.html`](display-640-parameter-compare.html) — Standalone 640 × 172 parameter and sequence layout study
+- [`reference/op1-design-kit`](reference/op1-design-kit/) — Static OP-1 Design Kit JSON/C reference tokens; no Skill installation
 
 ## Run locally
 
@@ -85,19 +87,23 @@ Run the automated tests with Node.js:
 node --test tests/*.test.js
 ```
 
-The current suite contains 51 tests covering display state, MIDI parsing, FX mappings, hardware interactions, theme behavior, and page structure. Automated tests do not replace verification with a physical SEQTRAK.
+The current suite contains 53 tests covering display state, MIDI parsing, FX mappings, hardware interactions, theme behavior, and page structure. Automated tests do not replace verification with a physical SEQTRAK.
 
 ## Design and implementation
 
 The project uses plain HTML, CSS, Canvas, SVG, and JavaScript. It intentionally avoids a framework and build pipeline so the interaction model remains easy to inspect and deploy on GitHub Pages.
 
-Typography uses Manrope, Space Grotesk, Barlow Condensed, and IBM Plex Mono across the site and display experiments.
+Typography uses Manrope, Space Grotesk, Barlow Condensed, and IBM Plex Mono across the site and display experiments. The standalone 640 × 172 comparison also uses the locally bundled Iosevka preview profiles from the OP-1 Design Kit.
 
 ## Credits
 
 Selected interface symbols are based on [Pixelarticons](https://github.com/halfmage/pixelarticons/tree/c9ecc2d), created by Gerrit Halfmann and licensed under the MIT License. The KICK symbol uses the supplied T-Rex SVG path. Selected SVG path data is included directly without adding an icon package dependency.
 
+The Alpha 2 FIELD DISPLAY uses selected regular icons from [Phosphor Icons Core 2.1.1](https://github.com/phosphor-icons/core) in its current-track header. Phosphor Icons is licensed under the MIT License. Only the required SVG paths are embedded; no runtime dependency or remote asset request is added.
+
 MUTE uses the Pixelarticons `mic-off` symbol; VOL uses the `volume` symbol for +/− feedback.
+
+The experimental 640 × 172 parameter comparison references the [OP-1 Design Kit v0.2.0 Draft](https://github.com/squarewave-studio/op1-design-kit) by SquareWave Studio. The kit guidance and metadata are MIT-licensed. Its bundled Iosevka preview fonts are distributed under the SIL Open Font License 1.1. Local notices are retained in [`assets/fonts/op1-design-kit`](assets/fonts/op1-design-kit/).
 
 SEQTRAK is a product name of Yamaha Corporation. Product names are used only to identify compatibility and project context.
 
@@ -173,6 +179,8 @@ USB-MIDI接続には、HTTPSまたはlocalhost上でChromeなどの対応Chromiu
 - [`live-monitor.html`](live-monitor.html) — 受信専用の演奏モニター
 - [`display-preview.html`](display-preview.html) — 旧ディスプレイプレビュー
 - [`hardware-preview.html`](hardware-preview.html) — 互換用エントリーポイント
+- [`display-640-parameter-compare.html`](display-640-parameter-compare.html) — 独立した640 × 172パラメーター／シーケンス比較案
+- [`reference/op1-design-kit`](reference/op1-design-kit/) — Skillを導入せず保持するOP-1 Design KitのJSON／C参照トークン
 
 ## ローカル実行
 
@@ -190,19 +198,23 @@ Node.jsがある環境では、次のコマンドで自動テストを実行で�
 node --test tests/*.test.js
 ```
 
-現在は、表示状態、MIDI解析、FXマッピング、本体操作、テーマ、ページ構造を対象とする51件のテストがあります。自動テストはSEQTRAK実機での確認を代替するものではありません。
+現在は、表示状態、MIDI解析、FXマッピング、本体操作、テーマ、ページ構造を対象とする52件のテストがあります。自動テストはSEQTRAK実機での確認を代替するものではありません。
 
 ## デザインと実装
 
 HTML、CSS、Canvas、SVG、JavaScriptで実装しています。構造を確認しやすく、GitHub Pagesへそのまま配置できるよう、フレームワークやビルド工程を使用していません。
 
-サイトと表示実験では、Manrope、Space Grotesk、Barlow Condensed、IBM Plex Monoを使用しています。
+サイトと表示実験では、Manrope、Space Grotesk、Barlow Condensed、IBM Plex Monoを使用しています。独立した640 × 172比較では、OP-1 Design Kitからローカル収録したIosevkaプレビュープロファイルも使用しています。
 
 ## クレジット
 
 一部のインターフェースアイコンに、Gerrit HalfmannによるMITライセンスの[Pixelarticons](https://github.com/halfmage/pixelarticons/tree/c9ecc2d)を使用しています。KICKには提供されたT-RexのSVGパスを使用しています。選択したSVGパスを直接収録しており、アイコン用の外部パッケージは追加していません。
 
+Alpha 2 FIELD DISPLAYでは、現在のトラックを示すヘッダーに[Phosphor Icons Core 2.1.1](https://github.com/phosphor-icons/core)のregularアイコンを使用しています。Phosphor IconsはMITライセンスです。必要なSVGパスのみを収録し、ランタイム依存や外部アセット通信は追加していません。
+
 MUTEのフィードバックにはPixelarticonsの`mic-off`、VOL＋／−には`volume`を使用しています。
+
+640 × 172パラメーター比較の実験では、SquareWave Studioによる[OP-1 Design Kit v0.2.0 Draft](https://github.com/squarewave-studio/op1-design-kit)を参照しています。キットのガイダンスとメタデータはMITライセンス、同梱したIosevkaプレビューフォントはSIL Open Font License 1.1です。ライセンス文は[`assets/fonts/op1-design-kit`](assets/fonts/op1-design-kit/)に保持しています。
 
 SEQTRAKはヤマハ株式会社の製品名です。製品名は互換性とプロジェクトの背景を示す目的でのみ使用しています。
 
