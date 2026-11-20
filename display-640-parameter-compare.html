@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SEQTRAK / 640 × 172 Parameter Comparison</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+      @font-face {
+        font-family: "OP1KitPreview";
+        src: url("assets/fonts/op1-design-kit/Iosevka-Regular.woff2") format("woff2");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "OP1KitPreview";
+        src: url("assets/fonts/op1-design-kit/Iosevka-Light.woff2") format("woff2");
+        font-weight: 300;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "OP1KitPreview";
+        src: url("assets/fonts/op1-design-kit/Iosevka-ExtraLight.woff2") format("woff2");
+        font-weight: 200;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "OP1KitPreview";
+        src: url("assets/fonts/op1-design-kit/Iosevka-Thin.woff2") format("woff2");
+        font-weight: 100;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        color-scheme: light;
+        --page: #e8e9e6;
+        --body: #f8f8f4;
+        --screen: #f4f6f2;
+        --text: #172124;
+        --muted: #667378;
+        --dim: #a8b1b0;
+        --line: #c9d1cf;
+        --kick: #a95d08;
+        --green: #087a67;
+        --blue: #006b83;
+        --purple: #67499b;
+        --pink: #b52e4b;
+        --op1-blue: #698eff;
+        --op1-green: #06c755;
+        --op1-white: #ffffff;
+        --op1-orange: #ff423f;
+        --page-text: #111416;
+        --page-muted: #5d6467;
+        --control: #dce2de;
+        --control-panel: #e9ede8;
+        --meter: #dce2df;
+        --step: #e1e6e3;
+        --step-on: #e8d5b9;
+      }
+
+      body[data-theme="dark"] {
+        color-scheme: dark;
+        --page: #0f0e12;
+        --body: #202427;
+        --screen: #080a0d;
+        --text: #f3f3ef;
+        --muted: #9aa3a9;
+        --dim: #4e585e;
+        --line: #293137;
+        --kick: #f6b04e;
+        --green: #7dd9b2;
+        --blue: #77d8f5;
+        --purple: #b79cff;
+        --pink: #ff6d84;
+        --op1-green: #00ed95;
+        --page-text: #f3f3ef;
+        --page-muted: #969fa3;
+        --control: #20282d;
+        --control-panel: #11171b;
+        --meter: #303940;
+        --step: #20282d;
+        --step-on: #5a4934;
+      }
+
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: var(--page); color: var(--page-text); font-family: "IBM Plex Mono", monospace; transition: background .18s ease, color .18s ease; }
+      .page { width: min(1040px, calc(100vw - 32px)); margin: 0 auto; padding: 56px 0 96px; }
+      .page-meta { display: grid; grid-template-columns: 1.1fr 1.2fr 1fr 1fr auto; gap: 16px; margin-bottom: 72px; color: var(--page-muted); font: 300 10px "OP1KitPreview", monospace; }
+      .page-meta span:first-child, .page-meta span:last-child { color: var(--page-text); }
+      .page-meta span:last-child { text-align: right; }
+      .intro { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: end; margin-bottom: 56px; }
+      h1 { max-width: 560px; margin: 0; font: 100 clamp(38px, 5.6vw, 72px)/.9 "OP1KitPreview", monospace; letter-spacing: -.04em; }
+      .intro-copy { display: grid; justify-items: start; gap: 12px; }
+      .intro p { max-width: 470px; margin: 0; color: var(--page-muted); font-size: 11px; line-height: 1.6; }
+      .theme-toggle { min-width: 156px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 1.5px; background: var(--page-text); color: var(--page); font: 300 9px "OP1KitPreview", monospace; letter-spacing: .04em; cursor: pointer; touch-action: manipulation; }
+      .comparison { display: grid; gap: 64px; }
+      .study-head { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 9px; }
+      .study-head h2 { margin: 0; font: 300 13px "OP1KitPreview", monospace; letter-spacing: .01em; }
+      .study-head span { color: var(--page-muted); font-size: 9px; }
+      .device { padding: 16px; border-radius: 0; background: var(--body); }
+      .viewport { width: 100%; aspect-ratio: 640 / 172; overflow: hidden; background: var(--screen); }
+      .screen { position: relative; width: 640px; height: 172px; overflow: hidden; transform-origin: left top; background: var(--screen); color: var(--text); font-family: "OP1KitPreview", monospace; font-synthesis: none; font-feature-settings: "cv01" 1, "cv02" 1, "cv03" 1, "cv04" 1, "cv05" 1, "cv06" 1, "cv07" 1, "cv08" 2, "cv09" 3, "cv10" 1, "cv19" 1; }
+      .topbar { height: 25px; display: grid; grid-template-columns: 184px 1fr auto; align-items: center; padding: 0 8px; font-size: 7px; font-weight: 600; letter-spacing: .1em; }
+      .connection { color: var(--green); }
+      .connection::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: currentColor; }
+      .scope { color: var(--muted); }
+      .scope b { color: var(--text); font-size: 9px; }
+      .page-index { color: var(--muted); }
+      .page-index b { color: var(--text); }
+      .label { color: var(--muted); font-size: 6px; font-weight: 600; letter-spacing: .11em; }
+      .unknown { color: var(--dim) !important; }
+
+      /* Individual track */
+      .single-layout { height: 147px; display: grid; grid-template-columns: 128px 184px 328px; padding: 0 8px 8px; }
+      .identity { position: relative; padding: 8px 8px 8px 0; }
+      .identity h3 { margin: 4px 0 0; color: var(--kick); font: 300 24px/.9 "OP1KitPreview", monospace; letter-spacing: -.035em; }
+      .sound { max-width: 118px; margin-top: 11px; color: var(--text); font-size: 9px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sound-meta { margin-top: 3px; color: var(--muted); font-size: 6px; }
+      .identity-state { position: absolute; bottom: 10px; left: 12px; display: flex; gap: 11px; color: var(--muted); font-size: 6px; }
+      .identity-state b { color: var(--text); font-weight: 500; }
+      .single-parameter { position: relative; padding: 8px; background: var(--control-panel); }
+      .parameter-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+      .parameter-tab { position: relative; min-width: 38px; height: 22px; padding: 0 2px 4px; border: 0; background: transparent; color: var(--muted); font: 400 6px "OP1KitPreview", monospace; letter-spacing: .02em; cursor: pointer; touch-action: manipulation; }
+      /* 22px visual control + 8px transparent area above and below = ~38px touch target. */
+      .parameter-tab::before, .all-tab::before { content: ""; position: absolute; inset: -8px -2px; }
+      .parameter-tab::after, .all-tab::after { content: ""; position: absolute; right: 3px; bottom: 0; left: 3px; height: 2px; background: var(--lane); opacity: .35; }
+      .parameter-tab:nth-child(1), .all-tab:nth-child(1) { --lane: var(--op1-blue); }
+      .parameter-tab:nth-child(2), .all-tab:nth-child(2) { --lane: var(--op1-green); }
+      .parameter-tab:nth-child(3), .all-tab:nth-child(3) { --lane: var(--text); }
+      .parameter-tab:nth-child(4), .all-tab:nth-child(4) { --lane: var(--op1-orange); }
+      .parameter-tab.active, .all-tab.active { outline: 0; background: transparent; color: var(--text); }
+      .parameter-tab.active::after, .all-tab.active::after { height: 3px; opacity: 1; }
+      .single-value-label { margin-top: 13px; color: var(--muted); font-size: 6px; letter-spacing: .08em; }
+      .single-value { position: absolute; right: 9px; bottom: 15px; font: 200 38px/.86 "OP1KitPreview", monospace; letter-spacing: -.04em; }
+      .parameter-graphic { position: absolute; left: 8px; bottom: 9px; width: 108px; height: 66px; overflow: visible; color: var(--op1-green); }
+      .parameter-graphic .guide { fill: none; stroke: var(--dim); stroke-width: .8; vector-effect: non-scaling-stroke; }
+      .parameter-graphic .signal { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+      .parameter-graphic .signal-fill { fill: currentColor; opacity: .12; stroke: none; }
+      .parameter-graphic .point { fill: var(--screen); stroke: currentColor; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+      .single-bar { position: absolute; right: 9px; bottom: 8px; left: 124px; height: 3px; background: var(--meter); }
+      .single-bar i { display: block; width: 43%; height: 100%; background: var(--kick); transition: width .18s ease; }
+      .single-range { display: none; }
+      .sequence-panel { padding: 8px 0 8px 12px; }
+      .sequence-head { display: flex; align-items: baseline; justify-content: space-between; }
+      .sequence-head b { font: 300 14px "OP1KitPreview", monospace; }
+      .sequence-head span { color: var(--muted); font-size: 6px; }
+      .steps { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; margin-top: 17px; }
+      .step { position: relative; height: 57px; background: var(--step); }
+      .step::after { content: attr(data-step); position: absolute; bottom: -13px; left: 50%; translate: -50% 0; color: var(--muted); font-size: 5px; }
+      .step.on { background: var(--step-on); }
+      .step.on::before { content: ""; position: absolute; right: 3px; bottom: 3px; left: 3px; height: var(--velocity); max-height: 47px; background: var(--kick); }
+      .step.playing { outline: 1px solid var(--text); outline-offset: 2px; }
+      .sequence-legend { display: flex; justify-content: space-between; margin-top: 19px; color: var(--muted); font-size: 5px; }
+      .sequence-legend b { color: var(--text); }
+
+      /* ALL tracks */
+      .all-layout { height: 147px; display: grid; grid-template-columns: 108px 1fr; padding: 0 8px 8px; }
+      .all-summary { padding: 8px 8px 8px 0; }
+      .all-summary h3 { margin: 4px 0 0; color: var(--text); font: 200 32px/.9 "OP1KitPreview", monospace; letter-spacing: -.04em; }
+      .all-summary p { margin: 9px 0 0; color: var(--muted); font-size: 6px; line-height: 1.5; }
+      .global-readout { margin-top: 13px; }
+      .global-readout strong { display: block; margin-top: 3px; color: var(--text); font: 300 20px/1 "OP1KitPreview", monospace; }
+      .all-parameter { padding: 8px; background: var(--control-panel); }
+      .all-tabs { display: grid; grid-template-columns: repeat(4, minmax(38px, 1fr)); gap: 3px; }
+      .all-tab { position: relative; min-width: 38px; height: 22px; padding: 0 8px 4px; border: 0; background: transparent; color: var(--muted); font: 400 7px "OP1KitPreview", monospace; letter-spacing: .05em; cursor: pointer; touch-action: manipulation; }
+      .all-readout { display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 20px; row-gap: 3px; margin-top: 10px; }
+      .track-row { display: grid; grid-template-columns: 59px 1fr 20px; align-items: center; min-width: 0; min-height: 14px; }
+      .track-name { overflow: hidden; color: var(--muted); font-size: 10px; font-weight: 500; line-height: 1; letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }
+      .track-name.active { color: var(--kick); font-weight: 500; }
+      .microbar { height: 4px; margin: 0 7px; background: var(--meter); }
+      .microbar i { display: block; width: var(--value); height: 100%; background: var(--color, var(--text)); transition: width .18s ease; }
+      .microbar.empty i { display: none; }
+      .track-value { color: var(--text); font-size: 6px; text-align: right; }
+      .track-value.unknown { color: var(--dim); }
+
+      .note { max-width: 760px; margin: 13px 2px 0; color: var(--page-muted); font-size: 9px; line-height: 1.55; }
+      .note b { color: var(--page-text); }
+      .kit-credit { margin: 10px 2px 0; color: var(--page-muted); font-size: 8px; }
+      .kit-credit a { color: inherit; text-underline-offset: 2px; }
+
+      @media (max-width: 700px) {
+        .page { width: calc(100vw - 20px); padding-top: 28px; }
+        .page-meta { grid-template-columns: 1fr 1fr; margin-bottom: 48px; }
+        .page-meta span:nth-child(4) { display: none; }
+        .intro { grid-template-columns: 1fr; gap: 14px; }
+        .device { padding: 7px; }
+      }
+    </style>
+  </head>
+  <body data-theme="dark">
+    <main class="page">
+      <div class="page-meta" aria-label="prototype metadata">
+        <span>SEQTRAK–FD</span><span>interface study</span><span>640 × 172</span><span></span><span>v.0.1</span>
+      </div>
+      <header class="intro">
+        <h1>parameters over navigation.</h1>
+        <div class="intro-copy">
+          <p>two 640 × 172 studies using the current FIELD DISPLAY language. the selected-track screen prioritizes editable sound values; the ALL screen compares received values across eleven tracks.</p>
+          <button id="themeToggle" class="theme-toggle" type="button" aria-pressed="true">dark · switch to light</button>
+        </div>
+      </header>
+
+      <div class="comparison">
+        <section class="study">
+          <header class="study-head"><h2>a / individual sound</h2><span>sound identity remains visible, but secondary.</span></header>
+          <div class="device">
+            <div class="viewport">
+              <div class="screen">
+                <header class="topbar">
+                  <div class="connection">USB MIDI · SEQTRAK</div>
+                  <div class="scope"><b>KICK</b> · CH 01 · TIGHT KICK 03</div>
+                  <div class="page-index"><b>PARAM</b>&nbsp;&nbsp; SEQ &nbsp; FX</div>
+                </header>
+                <div class="single-layout">
+                  <section class="identity">
+                    <div class="label">SELECTED SOUND</div>
+                    <h3>KICK</h3>
+                    <div class="sound">TIGHT KICK 03</div>
+                    <div class="sound-meta">VALUE 37 · DRUM</div>
+                    <div class="identity-state"><span>PATTERN <b>01</b></span><span>STEP <b>09</b></span></div>
+                  </section>
+                  <section class="single-parameter" aria-label="Individual track parameter">
+                    <div class="parameter-tabs" id="singleTabs" role="tablist" aria-label="Individual sound parameter">
+                      <button type="button" class="parameter-tab" data-parameter="volume" role="tab">VOL</button>
+                      <button type="button" class="parameter-tab active" data-parameter="decay" role="tab">DECAY</button>
+                      <button type="button" class="parameter-tab" data-parameter="cutoff" role="tab">CUTOFF</button>
+                      <button type="button" class="parameter-tab" data-parameter="reverb" role="tab">REV</button>
+                    </div>
+                    <div class="single-value-label" id="singleLabel">DECAY / RELEASE</div>
+                    <svg id="parameterGraphic" class="parameter-graphic" viewBox="0 0 108 66" aria-hidden="true"></svg>
+                    <div class="single-value" id="singleValue">55</div>
+                    <div class="single-bar"><i id="singleBar"></i></div>
+                    <div class="single-range"><span>0</span><span>127</span></div>
+                  </section>
+                  <section class="sequence-panel" aria-label="Individual track sequence">
+                    <div class="sequence-head"><b>PATTERN 01</b><span>16 STEPS · VELOCITY</span></div>
+                    <div class="steps">
+                      <i class="step on playing" data-step="01" style="--velocity:88%"></i><i class="step" data-step="02"></i><i class="step" data-step="03"></i><i class="step" data-step="04"></i>
+                      <i class="step on" data-step="05" style="--velocity:64%"></i><i class="step" data-step="06"></i><i class="step" data-step="07"></i><i class="step" data-step="08"></i>
+                      <i class="step on" data-step="09" style="--velocity:78%"></i><i class="step" data-step="10"></i><i class="step" data-step="11"></i><i class="step" data-step="12"></i>
+                      <i class="step on" data-step="13" style="--velocity:70%"></i><i class="step" data-step="14"></i><i class="step" data-step="15"></i><i class="step" data-step="16"></i>
+                    </div>
+                    <div class="sequence-legend"><span>BAR 01</span><b>PLAYHEAD · 01</b></div>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="study">
+          <header class="study-head"><h2>b / all tracks</h2><span>comparison view—not a claim of an ALL-knob MIDI dump.</span></header>
+          <div class="device">
+            <div class="viewport">
+              <div class="screen">
+                <header class="topbar">
+                  <div class="connection">USB MIDI · SEQTRAK</div>
+                  <div class="scope"><b>ALL TRACKS</b> · RECEIVED VALUES</div>
+                  <div class="page-index"><b>MIX</b>&nbsp;&nbsp; ACTIVITY &nbsp; FX</div>
+                </header>
+                <div class="all-layout">
+                  <section class="all-summary">
+                    <div class="label">SCOPE</div>
+                    <h3>ALL</h3>
+                    <p>11 TRACKS<br>LIVE COMPARISON</p>
+                    <div class="global-readout"><div class="label">PATTERN</div><strong>01</strong></div>
+                  </section>
+                  <section class="all-parameter" aria-label="All track parameter comparison">
+                    <div class="all-tabs" id="allTabs" role="tablist" aria-label="All track parameter">
+                      <button type="button" class="all-tab active" data-parameter="volume" role="tab">VOLUME</button>
+                      <button type="button" class="all-tab" data-parameter="decay" role="tab">DECAY</button>
+                      <button type="button" class="all-tab" data-parameter="cutoff" role="tab">CUTOFF</button>
+                      <button type="button" class="all-tab" data-parameter="reverb" role="tab">REVERB</button>
+                    </div>
+                    <div class="all-readout" id="allReadout"></div>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="note"><b>prototype rule:</b> a bar appears only when that channel has supplied a value during the session. missing data remains empty rather than borrowing the selected track’s value.</p>
+        </section>
+      </div>
+      <p class="kit-credit">Layout study adapted from the <a href="https://github.com/squarewave-studio/op1-design-kit">OP-1 Design Kit v0.2.0 Draft</a> by SquareWave Studio (MIT). Additional web styling references transferable principles documented by <a href="https://github.com/dot-Justin/teenage-engineering-ui-ux-skill">teenage-engineering-ui-ux</a>; no source assets or templates were copied. Theme adaptation and the SEQTRAK-specific interaction model are original to this prototype.</p>
+    </main>
+
+    <script>
+      (function () {
+        "use strict";
+        const themeToggle = document.getElementById("themeToggle");
+        function setTheme(theme) {
+          const dark = theme === "dark";
+          document.body.dataset.theme = dark ? "dark" : "light";
+          themeToggle.setAttribute("aria-pressed", String(dark));
+          themeToggle.textContent = dark ? "dark · switch to light" : "light · switch to dark";
+        }
+        themeToggle.addEventListener("click", function () {
+          setTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+        });
+        setTheme("dark");
+
+        const tracks = [
+          ["KICK", [88,43,58,19]], ["SNARE", [76,51,67,28]],
+          ["CLAP", [63,32,72,null]], ["HAT 1", [70,18,81,12]],
+          ["HAT 2", [58,24,76,null]], ["PERC 1", [64,46,null,16]],
+          ["PERC 2", [61,null,64,22]], ["SYNTH 1", [82,59,48,35]],
+          ["SYNTH 2", [73,67,55,42]], ["DX", [68,null,62,31]],
+          ["SAMPLER", [79,37,null,25]]
+        ];
+        const allParameterIndexes = { volume: 0, decay: 1, cutoff: 2, reverb: 3 };
+        const parameterColors = {
+          volume: "var(--op1-blue)", decay: "var(--op1-green)",
+          cutoff: "var(--text)", reverb: "var(--op1-orange)"
+        };
+        const singleParameters = {
+          volume: { label: "TRACK VOLUME", value: 112, color: parameterColors.volume },
+          decay: { label: "DECAY / RELEASE", value: 55, color: parameterColors.decay },
+          cutoff: { label: "FILTER CUTOFF", value: 74, color: parameterColors.cutoff },
+          reverb: { label: "REVERB SEND", value: 24, color: parameterColors.reverb }
+        };
+
+        function renderParameterGraphic(key, parameter) {
+          const graphic = document.getElementById("parameterGraphic");
+          const value = Math.max(0, Math.min(127, Number(parameter.value) || 0));
+          const ratio = value / 127;
+          graphic.style.color = parameter.color;
+          if (key === "volume") {
+            const amplitude = 4 + ratio * 19;
+            const points = [];
+            for (let x = 4; x <= 104; x += 4) {
+              const envelope = Math.sin((x - 4) / 100 * Math.PI);
+              const y = 34 + Math.sin(x * .42) * amplitude * envelope;
+              points.push((points.length ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1));
+            }
+            graphic.innerHTML = '<path class="guide" d="M4 34H104"/><path class="signal" d="' + points.join(" ") + '"/>';
+            return;
+          }
+          if (key === "decay") {
+            const settle = 30 + ratio * 67;
+            const knee = 10 + ratio * 18;
+            graphic.innerHTML =
+              '<path class="guide" d="M4 57H104M4 9V57"/>' +
+              '<path class="signal-fill" d="M4 11C' + knee.toFixed(1) + ' 11 ' + (settle * .48).toFixed(1) + ' 57 ' + settle.toFixed(1) + ' 57H4Z"/>' +
+              '<path class="signal" d="M4 11C' + knee.toFixed(1) + ' 11 ' + (settle * .48).toFixed(1) + ' 57 ' + settle.toFixed(1) + ' 57H104"/>' +
+              '<circle class="point" cx="4" cy="11" r="2.3"/><circle class="point" cx="' + settle.toFixed(1) + '" cy="57" r="2.3"/>';
+            return;
+          }
+          if (key === "cutoff") {
+            const cutoff = 13 + ratio * 78;
+            graphic.innerHTML =
+              '<path class="guide" d="M4 57H104M' + cutoff.toFixed(1) + ' 8V58"/>' +
+              '<path class="signal" d="M4 14H' + Math.max(4, cutoff - 10).toFixed(1) + 'Q' + cutoff.toFixed(1) + ' 14 ' + Math.min(104, cutoff + 10).toFixed(1) + ' 52H104"/>' +
+              '<circle class="point" cx="' + cutoff.toFixed(1) + '" cy="31" r="2.3"/>';
+            return;
+          }
+          const echoes = 3 + Math.round(ratio * 3);
+          let paths = '<path class="guide" d="M4 57H104"/><path class="signal" d="M4 57Q13 16 22 57"/>';
+          for (let i = 1; i <= echoes; i++) {
+            const start = 18 + i * 12;
+            const height = Math.max(5, 30 - i * 4);
+            paths += '<path class="signal" style="opacity:' + Math.max(.18, 1 - i * .14).toFixed(2) + '" d="M' + start + ' 57Q' + (start + 6) + ' ' + (57 - height) + ' ' + (start + 12) + ' 57"/>';
+          }
+          graphic.innerHTML = paths;
+        }
+
+        function selectSingleParameter(key) {
+          const parameter = singleParameters[key];
+          if (!parameter) return;
+          document.querySelectorAll(".parameter-tab").forEach(function (tab) {
+            tab.classList.toggle("active", tab.dataset.parameter === key);
+            tab.setAttribute("aria-selected", String(tab.dataset.parameter === key));
+          });
+          document.getElementById("singleLabel").textContent = parameter.label;
+          document.getElementById("singleValue").textContent = String(parameter.value).padStart(2, "0");
+          const bar = document.getElementById("singleBar");
+          bar.style.width = Math.round(parameter.value / 127 * 100) + "%";
+          bar.style.background = parameter.color;
+          renderParameterGraphic(key, parameter);
+        }
+
+        document.getElementById("singleTabs").addEventListener("click", function (event) {
+          const tab = event.target.closest("button[data-parameter]");
+          if (tab) selectSingleParameter(tab.dataset.parameter);
+        });
+
+        function renderAllParameter(key) {
+          const valueIndex = allParameterIndexes[key];
+          if (valueIndex === undefined) return;
+          document.querySelectorAll(".all-tab").forEach(function (tab) {
+            tab.classList.toggle("active", tab.dataset.parameter === key);
+            tab.setAttribute("aria-selected", String(tab.dataset.parameter === key));
+          });
+          const readout = document.getElementById("allReadout");
+          readout.replaceChildren();
+          tracks.forEach(function (track, index) {
+            const value = track[1][valueIndex];
+            const row = document.createElement("div");
+            row.className = "track-row";
+            row.innerHTML =
+              '<span class="track-name' + (index === 0 ? " active" : "") + '">' + track[0] + '</span>' +
+              '<span class="microbar' + (value === null ? " empty" : "") + '"><i style="--value:' + (value === null ? 0 : value) + '%;--color:' + parameterColors[key] + '"></i></span>' +
+              '<span class="track-value' + (value === null ? " unknown" : "") + '">' + (value === null ? "--" : value) + "</span>";
+            readout.appendChild(row);
+          });
+        }
+
+        document.getElementById("allTabs").addEventListener("click", function (event) {
+          const tab = event.target.closest("button[data-parameter]");
+          if (tab) renderAllParameter(tab.dataset.parameter);
+        });
+
+        selectSingleParameter("decay");
+        renderAllParameter("volume");
+
+        const steps = Array.from(document.querySelectorAll(".step"));
+        let playhead = 0;
+        setInterval(function () {
+          steps[playhead].classList.remove("playing");
+          playhead = (playhead + 1) % steps.length;
+          steps[playhead].classList.add("playing");
+          document.querySelector(".sequence-legend b").textContent = "PLAYHEAD · " + String(playhead + 1).padStart(2, "0");
+        }, 260);
+
+        function fit() {
+          document.querySelectorAll(".viewport").forEach(function (viewport) {
+            viewport.querySelector(".screen").style.transform = "scale(" + viewport.clientWidth / 640 + ")";
+          });
+        }
+        window.addEventListener("resize", fit);
+        fit();
+      })();
+    </script>
+  </body>
+</html>
